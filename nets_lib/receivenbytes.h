@@ -5,8 +5,16 @@
 #ifndef NETS_LIB_RECEIVE_N_BYTES_H
 #define NETS_LIB_RECEIVE_N_BYTES_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <sys/types.h>
 
-size_t receiveNBytes(int socket, size_t n, char *bytes);
+long receiveNBytes(int socket, size_t n, char *bytes);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //NETS_LIB_RECEIVE_N_BYTES_H

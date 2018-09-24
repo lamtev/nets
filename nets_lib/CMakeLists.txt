@@ -1,5 +1,7 @@
 project(NETS_LIB)
 
+set(CMAKE_C_STANDARD 90)
+
 set(NETS_LIB_SRC
         receivenbytes.h receivenbytes.c
         receiveuptodelimiter.h receiveuptodelimiter.c)
