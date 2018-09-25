@@ -10,10 +10,13 @@
 
 #include "main.h"
 
-Clients clients{};
-
 constexpr int DEFAULT_PORT = 7500;
 size_t messageLength;
+
+std::vector<Client> clients{};
+
+//TODO: looks like we don't need mutex because no problems can occur
+pthread_rwlock_t rwLock;
 
 int main(int argc, char **argv) {
     int port;
@@ -35,6 +38,13 @@ int main(int argc, char **argv) {
     localAddress.sin_port = htons(port);
     localAddress.sin_addr.s_addr = htonl(INADDR_ANY);
 
+    int enable = 1;
+    setsockopt(listeningSocket, SOL_SOCKET, SO_REUSEADDR, (void *) &enable, sizeof(int));
+
+#ifdef __APPLE__
+    setsockopt(listeningSocket, SOL_SOCKET, SO_NOSIGPIPE, (void *) &enable, sizeof(int));
+#endif
+
     int error = bind(listeningSocket, (struct sockaddr *) &localAddress, sizeof(localAddress));
     if (error != 0) {
         std::cerr << "Unable to bind: " << strerror(errno) << std::endl;
@@ -47,6 +57,8 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    initRwLock();
+
     pthread_t acceptThread;
 
     AcceptThreadArgs acceptThreadArgs{};
@@ -58,19 +70,18 @@ int main(int argc, char **argv) {
         std::getline(std::cin, instruction);
 
         if (instruction == "exit") {
-            shutdown(listeningSocket, SHUT_RDWR);
-            close(listeningSocket);
-            pthread_join(acceptThread, nullptr);
             break;
         } else if (instruction == "list") {
+            pthread_rwlock_rdlock(&rwLock);
             for (size_t i = 0; i < clients.size(); ++i) {
-                int socket = clients.get(i).socket;
+                int socket = clients[i].socket;
                 sockaddr_in addr{};
                 getpeername(socket, (sockaddr *) &addr, nullptr);
                 char ipStr[INET_ADDRSTRLEN];
                 inet_ntop(AF_INET, &(addr.sin_addr), ipStr, INET_ADDRSTRLEN);
                 std::cout << i + 1 << ".\t" << ipStr << ":" << addr.sin_port << std::endl;
             }
+            pthread_rwlock_unlock(&rwLock);
         } else {
             auto idx = instruction.find_last_of("kill");
             if (idx != std::string::npos) {
@@ -81,45 +92,55 @@ int main(int argc, char **argv) {
                     printHelp();
                     continue;
                 }
-                killClientWithIndex(clientIndex - 1, true, true);
+                pthread_rwlock_wrlock(&rwLock);
+                killClientWithIndex(clientIndex - 1, true);
+                clients.erase(clients.cbegin() + clientIndex - 1);
+                pthread_rwlock_unlock(&rwLock);
             }
         }
     }
 
+    shutdown(listeningSocket, SHUT_RDWR);
+    close(listeningSocket);
+    pthread_join(acceptThread, nullptr);
+
+    deinitRwLock();
+
     return 0;
 }
 
-#pragma mark - Thread routines
 
 void *acceptThreadRoutine(void *args) {
     auto acceptThreadArgs = reinterpret_cast<AcceptThreadArgs *>(args);
 
     while (true) {
-        int *acceptedSocket = new int{};
-        *acceptedSocket = accept(acceptThreadArgs->listeningSocket, nullptr, nullptr);
+        int acceptedSocket = accept(acceptThreadArgs->listeningSocket, nullptr, nullptr);
 
-        if (*acceptedSocket == -1) {
+        if (acceptedSocket == -1) {
             std::cerr << "Unable to accept: " << strerror(errno) << std::endl;
             break;
-        } else {
-            std::cout << "Accepted" << std::endl;
         }
+        std::cout << "Accepted" << std::endl;
 
         pthread_t clientThread = nullptr;
         pthread_attr_t clientThreadAttr;
         pthread_attr_init(&clientThreadAttr);
 
-        clients.add(Client{*acceptedSocket, clientThread});
+        pthread_rwlock_wrlock(&rwLock);
+        clients.emplace_back(acceptedSocket, clientThread);
+        pthread_rwlock_unlock(&rwLock);
 
         auto *clientThreadArgs = new ClientThreadArgs{};
         clientThreadArgs->socket = acceptedSocket;
         pthread_create(&clientThread, &clientThreadAttr, clientThreadRoutine, reinterpret_cast<void *>(clientThreadArgs));
     }
 
+    pthread_rwlock_wrlock(&rwLock);
     for (size_t i = 0; i < clients.size(); ++i) {
-        killClientWithIndex(i);
+        killClientWithIndex(i, false);
     }
     clients.clear();
+    pthread_rwlock_unlock(&rwLock);
 
     return nullptr;
 }
@@ -127,104 +148,52 @@ void *acceptThreadRoutine(void *args) {
 void *clientThreadRoutine(void *args) {
     auto clientThreadArgs = reinterpret_cast<ClientThreadArgs *>(args);
 
-    while (*clientThreadArgs->socket != -1) {
+    while (true) {
         char buf[messageLength];
-        ssize_t bytesReceived = receiveNBytes(*clientThreadArgs->socket, messageLength, buf);
+        ssize_t bytesReceived = receiveNBytes(clientThreadArgs->socket, messageLength, buf);
         if (bytesReceived == -1 || bytesReceived == 0) {
             std::cerr << "Unable to receive: " << strerror(errno) << std::endl;
             break;
         }
         std::cout << "Received bytes: " << buf << std::endl;
 
-        ssize_t bytesSent = send(*clientThreadArgs->socket, buf, strlen(buf), 0);
+#ifdef __APPLE__
+        ssize_t bytesSent = send(clientThreadArgs->socket, buf, strlen(buf), 0);
+#else
+        ssize_t bytesSent = send(clientThreadArgs->socket, buf, strlen(buf), MSG_NOSIGNAL);
+#endif
         if (bytesSent == -1) {
             std::cerr << "Unable to send: " << strerror(errno) << std::endl;
         }
     }
 
-    delete clientThreadArgs->socket;
     delete clientThreadArgs;
 
     return nullptr;
 }
 
-void killClientWithIndex(size_t index, bool safe, bool remove) {
+void killClientWithIndex(size_t index, bool safe) {
     if (safe && clients.size() <= index) {
         return;
     }
-    const auto &client = clients.get(index);
+    const auto &client = clients[index];
     shutdown(client.socket, SHUT_RDWR);
     close(client.socket);
 
     pthread_join(client.thread, nullptr);
-
-    if (remove) {
-        clients.remove(index);
-    }
 }
 
-#pragma mark - Client inplementation
 
 Client::Client(int socket, pthread_t thread) : socket{socket}, thread{thread} {}
 
-#pragma mark - Clients implementation
-
-Clients::Clients() noexcept {
-    pthread_mutex_init(&readLock, nullptr);
-    pthread_mutex_init(&writeLock, nullptr);
+void initRwLock() {
+    pthread_rwlock_init(&rwLock, nullptr);
 }
 
-Clients::~Clients() noexcept {
-    pthread_mutex_destroy(&readLock);
-    pthread_mutex_destroy(&writeLock);
+void deinitRwLock() {
+    pthread_rwlock_destroy(&rwLock);
 }
 
-const Client &Clients::get(size_t index) {
-    pthread_mutex_lock(&writeLock);
-    const auto &cl = clients[index];
-    pthread_mutex_unlock(&writeLock);
-
-    return cl;
-}
-
-size_t Clients::size() noexcept {
-    pthread_mutex_lock(&writeLock);
-    auto sz = clients.size();
-    pthread_mutex_unlock(&writeLock);
-
-    return sz;
-}
-
-void Clients::add(const Client &client) noexcept {
-    rwLock();
-    clients.push_back(client);
-    rwUnlock();
-}
-
-void Clients::remove(size_t index) {
-    rwLock();
-    clients.erase(clients.cbegin() + index);
-    rwUnlock();
-}
-
-void Clients::clear() noexcept {
-    rwLock();
-    clients.clear();
-    rwUnlock();
-}
-
-void Clients::rwLock() {
-    pthread_mutex_lock(&readLock);
-    pthread_mutex_lock(&writeLock);
-}
-
-void Clients::rwUnlock() {
-    pthread_mutex_unlock(&readLock);
-    pthread_mutex_unlock(&writeLock);
-}
-
-
-#pragma mark - Help
 
 static const char *helpMessage = R"(
 Usage:
@@ -249,14 +218,13 @@ void printLaunchHelp() {
     std::cout << launchHelpMessage << std::endl;
 }
 
-#pragma mark - Program arguments parsing
 
 bool parseProgramArguments(int argc, char **argv, int &port, size_t &messageLength) {
     if (argc == 1) {
         port = DEFAULT_PORT;
         messageLength = 64;
         return true;
-    } else if (argc > 5) {
+    } else if (argc > 5 || argc == 0) {
         return false;
     } else {
         std::string argv1 = argv[1];
