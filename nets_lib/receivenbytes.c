@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <memory.h>
 
-long receiveNBytes(int socket, size_t n, char *bytes) {
+long receiveNBytes(int socket, size_t n, void *bytes) {
     size_t received = 0;
     while (received < n && received >= 0) {
         ssize_t recvd = recv(socket, &bytes[received], n - received, 0);

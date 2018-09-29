@@ -6,9 +6,9 @@
 #include "receiveuptodelimiter.h"
 
 
-size_t receiveUpToDelimiter(int socket, char delimiter, char *bytes) {
+size_t receiveUpToDelimiter(int socket, char delimiter, void *bytes) {
   size_t received = 0;
-  while (bytes[received] != delimiter) {
+  while (((char *) bytes)[received] != delimiter) {
     received += recv(socket, &bytes[received], 1, 0);
   }
 

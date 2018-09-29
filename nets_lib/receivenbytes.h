@@ -11,7 +11,7 @@ extern "C" {
 
 #include <sys/types.h>
 
-long receiveNBytes(int socket, size_t n, char *bytes);
+long receiveNBytes(int socket, size_t n, void *bytes);
 
 #ifdef __cplusplus
 }
