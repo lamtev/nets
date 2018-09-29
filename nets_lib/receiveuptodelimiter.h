@@ -11,7 +11,7 @@ extern "C" {
 
 #include <sys/types.h>
 
-size_t receiveUpToDelimiter(int socket, char delimiter, char *bytes);
+size_t receiveUpToDelimiter(int socket, char delimiter, void *bytes);
 
 #ifdef __cplusplus
 }
