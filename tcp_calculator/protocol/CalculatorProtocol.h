@@ -5,25 +5,15 @@
 #ifndef NETS_CALCULATORPROTOCOL_H
 #define NETS_CALCULATORPROTOCOL_H
 
-#include "Operation.h"
+#include <cstdint>
 
-/**
- *
- *
- * Codes:
- *
- * 0x00 - "+"
- * 0x01 - "-"
- * 0x02 - "*"
- * 0x03 - "/"
- * 0x04 - "!"
- * 0x05 - "√"
- *
- */
+class Operation;
+class Message;
+
 class CalculatorProtocol {
  public:
-    static unsigned char *encode(const Operation &operation);
-    static Operation *decode(unsigned char *bytes);
+    static u_int8_t *encode(const Message &message);
+    static Message *decode(u_int8_t *bytes);
 };
 
 #endif //NETS_CALCULATORPROTOCOL_H
