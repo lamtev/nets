@@ -3,8 +3,6 @@
 //
 
 #include <sys/socket.h>
-#include <stdlib.h>
-#include <memory.h>
 
 long receiveNBytes(int socket, size_t n, void *bytes) {
     size_t received = 0;
