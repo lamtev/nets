@@ -13,6 +13,7 @@
 #include "ServerIODelegate.h"
 
 class ServerNetDelegate;
+class Message;
 
 class ServerNet : public ServerIODelegate {
  private:
@@ -35,6 +36,7 @@ class ServerNet : public ServerIODelegate {
  private:
     uint64_t nextId() noexcept;
     static void closeSocket(int socket);
+    Message *handleRequest(Message *request);
 };
 
 

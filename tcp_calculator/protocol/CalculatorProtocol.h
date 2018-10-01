@@ -12,7 +12,7 @@ class Message;
 
 class CalculatorProtocol {
  public:
-    static uint8_t *encode(const Message &message);
+    static uint8_t *encode(const Message *message);
     static Message *decode(uint8_t *bytes);
 };
 

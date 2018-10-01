@@ -12,6 +12,7 @@
 #include <protocol/CalculatorProtocol.h>
 #include <protocol/Message.h>
 #include <protocol/Operation.h>
+#include <protocol/BitsUtils.h>
 
 #include "ServerNet.h"
 #include "ServerNetError.h"
@@ -96,31 +97,24 @@ void ServerNet::start() {
                         break;
                     }
 
-                    auto message = CalculatorProtocol::decode(bytes);
+                    auto request = CalculatorProtocol::decode(bytes);
 
                     //TODO: handle message
+                    auto response = handleRequest(request);
 
-                    switch (message->type()) {
-                    case MessageType::MATH_RESPONSE: {
-                        auto operation = Operation::of(bytes);
-                        //TODO: handle operation
-
-                        delete operation;
-                        break;
-                        //TODO: handle other message types
-                    }
-                    default:
-                        break;
-                    }
-
-                    delete message;
+                    auto bytesToBeSent = CalculatorProtocol::encode(response);
+                    delete[] response->data();
+                    delete response;
+                    delete request;
                     delete[] bytes;
 
 #ifdef __APPLE__
-                    ssize_t bytesSent = send(acceptedSocket, nullptr, 0, 0);
+                    ssize_t bytesSent = send(acceptedSocket, bytesToBeSent, bytesToBeSent[0] + 1, 0);
 #else
-                    ssize_t bytesSent = send(acceptedSocket, nullptr, 0, MSG_NOSIGNAL);
+                    ssize_t bytesSent = send(acceptedSocket, bytesToBeSent, bytesToBeSent[0] + 1, MSG_NOSIGNAL);
 #endif
+                    delete[] bytesToBeSent;
+
                     if (bytesSent == -1) {
                         if (delegate != nullptr) {
                             delegate->netDidFailWithError(this, ServerNetError::SOCKET_SEND_ERROR);
@@ -159,6 +153,50 @@ uint64_t ServerNet::nextId() noexcept {
 void ServerNet::closeSocket(int socket) {
     shutdown(socket, SHUT_RDWR);
     close(socket);
+}
+
+Message *ServerNet::handleRequest(Message *request) {
+    MessageType responseType;
+    uint8_t dataSize;
+    uint8_t *data;
+    switch (request->type()) {
+    case MessageType::MATH_RESPONSE: {
+        auto operation = Operation::of(request->data());
+        responseType = MessageType::MATH_RESPONSE;
+        int64_t res;
+        switch (operation->type()) {
+        case OperationType::ADDITION: {
+            res = operation->operand1() + operation->operand2();
+            break;
+        }
+        case OperationType::SUBTRACTION: {
+            res = operation->operand1() - operation->operand2();
+            break;
+        }
+        case OperationType::MULTIPLICATION: {
+            res = operation->operand1() * operation->operand2();
+            break;
+        }
+        case OperationType::DIVISION: {
+            res = operation->operand1() / operation->operand2();
+            break;
+        }
+        default:
+            res = 0;
+            break;
+        }
+        delete operation;
+        dataSize = 8;
+        data = new uint8_t[dataSize];
+        int64AsBytes(res, data);
+        break;
+    }
+        //TODO: handle other message types
+    default:
+        break;
+    }
+
+    return new Message(responseType, dataSize, data);
 }
 
 void ServerNet::ioWantsToKillClientWithId(ServerIO *io, uint64_t id) {

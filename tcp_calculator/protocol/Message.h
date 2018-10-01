@@ -22,20 +22,13 @@ class Message {
     uint8_t *_data;
 
  public:
-    Message(MessageType type, uint8_t dataSize, uint8_t *data) : _type(type), _dataSize(dataSize), _data(data) {
-    }
+    Message(MessageType type, uint8_t dataSize, uint8_t *data) : _type(type), _dataSize(dataSize), _data(data) {}
 
-    MessageType type() const {
-        return _type;
-    }
+    MessageType type() const { return _type; }
 
-    uint8_t dataSize() const {
-        return _dataSize;
-    }
+    uint8_t dataSize() const { return _dataSize; }
 
-    uint8_t *data() const {
-        return _data;
-    }
+    uint8_t *data() const { return _data; }
 
 };
 
