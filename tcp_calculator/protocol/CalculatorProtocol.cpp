@@ -7,9 +7,9 @@
 #include "Message.h"
 #include "CalculatorProtocol.h"
 
-uint8_t *CalculatorProtocol::encode(const Message &message) {
-    auto bytes = new uint8_t[2 + message.dataSize()];
-    switch (message.type()) {
+uint8_t *CalculatorProtocol::encode(const Message *message) {
+    auto bytes = new uint8_t[2 + message->dataSize()];
+    switch (message->type()) {
     case MessageType::MATH_REQUEST:
         bytes[1] = 0x00;
         break;
@@ -28,8 +28,8 @@ uint8_t *CalculatorProtocol::encode(const Message &message) {
     default:
         return nullptr;
     }
-    bytes[0] = static_cast<uint8_t>(message.dataSize() + 1);
-    std::memcpy(&bytes[2], message.data(), message.dataSize());
+    bytes[0] = static_cast<uint8_t>(message->dataSize() + 1);
+    std::memcpy(&bytes[2], message->data(), message->dataSize());
 
     return bytes;
 }

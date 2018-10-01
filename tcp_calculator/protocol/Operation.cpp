@@ -3,23 +3,7 @@
 //
 
 #include "Operation.h"
-
-void longAsBytes(int64_t _long, uint8_t *bytes) {
-    for (auto i = 0; i < 8; ++i) {
-        bytes[7 - i] = (unsigned char) (_long >> (i << 3));
-    }
-}
-
-long bytesAsLong(const uint8_t *bytes) {
-    return (((int64_t) bytes[0]) << 56 |
-            ((int64_t) bytes[1]) << 48 |
-            ((int64_t) bytes[2]) << 40 |
-            ((int64_t) bytes[3]) << 32 |
-            ((int64_t) bytes[4]) << 24 |
-            ((int64_t) bytes[5]) << 16 |
-            ((int64_t) bytes[6]) << 8 |
-            ((int64_t) bytes[7]));
-}
+#include "BitsUtils.h"
 
 Operation *Operation::of(uint8_t *bytes) {
     switch (bytes[0]) {
@@ -55,46 +39,46 @@ uint8_t *Operation::toBytes() const {
     case OperationType::ADDITION: {
         auto *bytes = new unsigned char[17];
         bytes[0] = 0x00;
-        longAsBytes(_operand1, &bytes[1]);
-        longAsBytes(_operand2, &bytes[9]);
+        int64AsBytes(_operand1, &bytes[1]);
+        int64AsBytes(_operand2, &bytes[9]);
 
         return bytes;
     }
     case OperationType::SUBTRACTION: {
         auto *bytes = new unsigned char[17];
         bytes[0] = 0x01;
-        longAsBytes(_operand1, &bytes[1]);
-        longAsBytes(_operand2, &bytes[9]);
+        int64AsBytes(_operand1, &bytes[1]);
+        int64AsBytes(_operand2, &bytes[9]);
 
         return bytes;
     }
     case OperationType::MULTIPLICATION: {
         auto *bytes = new unsigned char[17];
         bytes[0] = 0x02;
-        longAsBytes(_operand1, &bytes[1]);
-        longAsBytes(_operand2, &bytes[9]);
+        int64AsBytes(_operand1, &bytes[1]);
+        int64AsBytes(_operand2, &bytes[9]);
 
         return bytes;
     }
     case OperationType::DIVISION: {
         auto *bytes = new unsigned char[17];
         bytes[0] = 0x03;
-        longAsBytes(_operand1, &bytes[1]);
-        longAsBytes(_operand2, &bytes[9]);
+        int64AsBytes(_operand1, &bytes[1]);
+        int64AsBytes(_operand2, &bytes[9]);
 
         return bytes;
     }
     case OperationType::SQUARE_ROOT: {
         auto *bytes = new unsigned char[9];
         bytes[0] = 0x04;
-        longAsBytes(_operand1, &bytes[1]);
+        int64AsBytes(_operand1, &bytes[1]);
 
         return bytes;
     }
     case OperationType::FACTORIAL: {
         auto *bytes = new unsigned char[9];
         bytes[0] = 0x05;
-        longAsBytes(_operand1, &bytes[1]);
+        int64AsBytes(_operand1, &bytes[1]);
 
         return bytes;
     }
