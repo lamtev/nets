@@ -23,7 +23,7 @@ class Operation {
     int64_t _operand1;
     int64_t _operand2;
     bool _isValid;
-    u_int8_t _nBytes;
+    uint8_t _nBytes;
 
  public:
 
@@ -39,11 +39,11 @@ class Operation {
      * 0x05 - "√"
      *
      */
-    static Operation *of(u_int8_t *bytes);
+    static Operation *of(uint8_t *bytes);
 
-    u_int8_t *toBytes() const;
+    uint8_t *toBytes() const;
 
-    u_int8_t nBytes() const noexcept;
+    uint8_t nBytes() const noexcept;
 
     bool isValid() const noexcept;
 

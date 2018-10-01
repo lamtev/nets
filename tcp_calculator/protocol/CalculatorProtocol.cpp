@@ -7,8 +7,8 @@
 #include "Message.h"
 #include "CalculatorProtocol.h"
 
-u_int8_t *CalculatorProtocol::encode(const Message &message) {
-    auto bytes = new u_int8_t[2 + message.dataSize()];
+uint8_t *CalculatorProtocol::encode(const Message &message) {
+    auto bytes = new uint8_t[2 + message.dataSize()];
     switch (message.type()) {
     case MessageType::MATH_REQUEST:
         bytes[1] = 0x00;
@@ -28,13 +28,13 @@ u_int8_t *CalculatorProtocol::encode(const Message &message) {
     default:
         return nullptr;
     }
-    bytes[0] = static_cast<u_int8_t>(message.dataSize() + 1);
+    bytes[0] = static_cast<uint8_t>(message.dataSize() + 1);
     std::memcpy(&bytes[2], message.data(), message.dataSize());
 
     return bytes;
 }
 
-Message *CalculatorProtocol::decode(u_int8_t *bytes) {
+Message *CalculatorProtocol::decode(uint8_t *bytes) {
     MessageType messageType;
     switch (bytes[1]) {
     case 0x00:
@@ -56,5 +56,5 @@ Message *CalculatorProtocol::decode(u_int8_t *bytes) {
         return nullptr;
     }
 
-    return new Message(messageType, static_cast<u_int8_t>(bytes[0] - 1), &bytes[2]);
+    return new Message(messageType, static_cast<uint8_t>(bytes[0] - 1), &bytes[2]);
 }

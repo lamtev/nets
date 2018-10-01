@@ -14,6 +14,7 @@ class Server {
  private:
     ServerNet *net;
     ServerIO *io;
+
  public:
     Server(uint16_t port);
     ~Server();

@@ -6,6 +6,7 @@
 
 Server::Server(uint16_t port) : net(new ServerNet(port)), io(new ServerIO()) {
     net->setDelegate(io);
+    io->setDelegate(net);
 }
 
 Server::~Server() {
@@ -14,8 +15,11 @@ Server::~Server() {
 }
 
 void Server::start() {
+    std::thread ioThread([this]() {
+        io->start();
+    });
     net->start();
-    io->start();
+    ioThread.join();
 }
 
 void Server::stop() {

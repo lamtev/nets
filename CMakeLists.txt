@@ -9,7 +9,3 @@ add_subdirectory(tcp/n_clients_n_threads_server)
 add_subdirectory(nets_lib)
 
 add_subdirectory(tcp_calculator)
-
-#add_subdirectory(tcp_calculator/server)
-#add_subdirectory(tcp_calculator/protocol)
-#add_subdirectory(tcp_calculator/protocol_test)

@@ -160,7 +160,7 @@ void *clientThreadRoutine(void *args) {
 #ifdef __APPLE__
         ssize_t bytesSent = send(clientThreadArgs->socket, buf, strlen(buf), 0);
 #else
-        ssize_t bytesSent = send(clientThreadArgs->socket, buf, strlen(buf), MSG_NOSIGNAL);
+        ssize_t bytesSent = send(clientThreadArgs->_socket, buf, strlen(buf), MSG_NOSIGNAL);
 #endif
         if (bytesSent == -1) {
             std::cerr << "Unable to send: " << strerror(errno) << std::endl;

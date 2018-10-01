@@ -12,8 +12,8 @@ class Message;
 
 class CalculatorProtocol {
  public:
-    static u_int8_t *encode(const Message &message);
-    static Message *decode(u_int8_t *bytes);
+    static uint8_t *encode(const Message &message);
+    static Message *decode(uint8_t *bytes);
 };
 
 #endif //NETS_CALCULATORPROTOCOL_H
