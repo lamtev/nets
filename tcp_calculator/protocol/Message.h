@@ -5,7 +5,7 @@
 #ifndef NETS_MESSAGE_H
 #define NETS_MESSAGE_H
 
-#include <sys/types.h>
+#include <cstdint>
 
 enum class MessageType {
     MATH_REQUEST = 0,
@@ -18,22 +18,22 @@ enum class MessageType {
 class Message {
  private:
     MessageType _type;
-    u_int8_t _dataSize;
-    u_int8_t *_data;
+    uint8_t _dataSize;
+    uint8_t *_data;
 
  public:
-    Message(MessageType type, u_int8_t dataSize, u_int8_t *data) : _type(type), _dataSize(dataSize), _data(data) {
+    Message(MessageType type, uint8_t dataSize, uint8_t *data) : _type(type), _dataSize(dataSize), _data(data) {
     }
 
     MessageType type() const {
         return _type;
     }
 
-    u_int8_t dataSize() const {
+    uint8_t dataSize() const {
         return _dataSize;
     }
 
-    u_int8_t *data() const {
+    uint8_t *data() const {
         return _data;
     }
 

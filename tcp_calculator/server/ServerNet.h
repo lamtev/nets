@@ -6,31 +6,36 @@
 #define NETS_SERVERNET_H
 
 #include <cstdint>
+#include <shared_mutex>
+#include <vector>
+
+#include "ClientSession.h"
+#include "ServerIODelegate.h"
+
 class ServerNetDelegate;
 
-class ServerNet {
+class ServerNet : public ServerIODelegate {
  private:
-    uint16_t port;
+    const uint16_t port;
+    int listeningSocket{};
     ServerNetDelegate *delegate;
+    std::vector<ClientSession> clients;
+    std::shared_mutex clientsMutex;
+    std::atomic<uint64_t> idCounter;
+
  public:
-    ServerNet(uint16_t port);
+    explicit ServerNet(uint16_t port);
     void setDelegate(ServerNetDelegate *delegate);
     void start();
     void stop();
+    void ioWantsToKillClientWithId(ServerIO *io, uint64_t id) override;
+    std::vector<ClientSession> ioWantsToListClients(ServerIO *io) override;
+    void ioWantsToExit(ServerIO *io) override;
+
+ private:
+    uint64_t nextId() noexcept;
+    static void closeSocket(int socket);
 };
 
-enum class ServerNetError {
-    SOCKET_CREATE_ERROR,
-    SOCKET_BIND_ERROR,
-    SOCKET_LISTEN_ERROR,
-    SOCKET_ACCEPT_ERROR,
-    RECEIVE_ERROR,
-    SEND_ERROR,
-};
-
-class ServerNetDelegate {
- public:
-    virtual void netDidFailWithError(ServerNet *net, ServerNetError error) = 0;
-};
 
 #endif //NETS_SERVERNET_H

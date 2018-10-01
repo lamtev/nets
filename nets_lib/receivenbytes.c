@@ -11,7 +11,7 @@ long receiveNBytes(int socket, size_t n, void *bytes) {
         if (recvd == -1) {
             return -1;
         } else if (recvd == 0) {
-            // If TCP socket
+            // If TCP _socket
             // the peer has closed its half side of the connection.
             return 0;
         }

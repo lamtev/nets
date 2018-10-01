@@ -1,0 +1,20 @@
+//
+// Created by anton.lamtev on 01.10.2018.
+//
+
+#ifndef NETS_SERVERNETERROR_H
+#define NETS_SERVERNETERROR_H
+
+
+enum class ServerNetError {
+    SOCKET_CREATE_ERROR,
+    SOCKET_BIND_ERROR,
+    SOCKET_LISTEN_ERROR,
+    SOCKET_ACCEPT_ERROR,
+    SOCKET_RECEIVE_ERROR,
+    SOCKET_SEND_ERROR,
+    KILL_CLIENT_ERROR,
+};
+
+
+#endif //NETS_SERVERNETERROR_H

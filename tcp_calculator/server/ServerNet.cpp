@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <iostream>
 #include <thread>
+#include <unistd.h>
 
 #include <nets_lib/receivenbytes.h>
 #include <protocol/CalculatorProtocol.h>
@@ -13,8 +14,12 @@
 #include <protocol/Operation.h>
 
 #include "ServerNet.h"
+#include "ServerNetError.h"
+#include "ClientSession.h"
+#include "ServerNetDelegate.h"
 
-ServerNet::ServerNet(uint16_t port) : port(port) {
+
+ServerNet::ServerNet(uint16_t port) : port(port), clients(), clientsMutex(), idCounter(0) {
 }
 
 void ServerNet::setDelegate(ServerNetDelegate *delegate) {
@@ -22,11 +27,12 @@ void ServerNet::setDelegate(ServerNetDelegate *delegate) {
 }
 
 void ServerNet::start() {
-    int listeningSocket = socket(AF_INET, SOCK_STREAM, 0);
+    listeningSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (listeningSocket < 0) {
         if (delegate != nullptr) {
             delegate->netDidFailWithError(this, ServerNetError::SOCKET_CREATE_ERROR);
         }
+        return;
     }
 
     sockaddr_in localAddress{};
@@ -46,6 +52,7 @@ void ServerNet::start() {
         if (delegate != nullptr) {
             delegate->netDidFailWithError(this, ServerNetError::SOCKET_BIND_ERROR);
         }
+        return;
     }
 
     error = listen(listeningSocket, 5);
@@ -53,10 +60,10 @@ void ServerNet::start() {
         if (delegate != nullptr) {
             delegate->netDidFailWithError(this, ServerNetError::SOCKET_LISTEN_ERROR);
         }
+        return;
     }
-    //TODO: join accept thread
-    //TODO: join client threads
-    auto acceptThread = std::thread([listeningSocket, this]() {
+
+    auto acceptThread = std::thread([this]() {
         while (true) {
             int acceptedSocket = accept(listeningSocket, nullptr, nullptr);
             if (acceptedSocket == -1) {
@@ -66,14 +73,14 @@ void ServerNet::start() {
                 }
             }
 
-            auto clientThread = std::thread([acceptedSocket, this]() {
+            auto clientThread = new std::thread([acceptedSocket, this]() {
                 while (true) {
-                    u_int8_t bytesToBeReceived;
+                    uint8_t bytesToBeReceived;
                     ssize_t bytesReceived = recv(acceptedSocket, &bytesToBeReceived, 1, 0);
 
                     if (bytesReceived == -1 || bytesReceived == 0) {
                         if (delegate != nullptr) {
-                            delegate->netDidFailWithError(this, ServerNetError::RECEIVE_ERROR);
+                            delegate->netDidFailWithError(this, ServerNetError::SOCKET_RECEIVE_ERROR);
                         }
                         break;
                     }
@@ -84,7 +91,7 @@ void ServerNet::start() {
                     bytesReceived = receiveNBytes(acceptedSocket, bytesToBeReceived, bytes);
                     if (bytesReceived == -1 || bytesReceived == 0) {
                         if (delegate != nullptr) {
-                            delegate->netDidFailWithError(this, ServerNetError::RECEIVE_ERROR);
+                            delegate->netDidFailWithError(this, ServerNetError::SOCKET_RECEIVE_ERROR);
                         }
                         break;
                     }
@@ -95,8 +102,10 @@ void ServerNet::start() {
 
                     switch (message->type()) {
                     case MessageType::MATH_RESPONSE: {
-                        auto operation = reinterpret_cast<Operation *>(message->data());
+                        auto operation = Operation::of(bytes);
                         //TODO: handle operation
+
+                        delete operation;
                         break;
                         //TODO: handle other message types
                     }
@@ -114,15 +123,67 @@ void ServerNet::start() {
 #endif
                     if (bytesSent == -1) {
                         if (delegate != nullptr) {
-                            delegate->netDidFailWithError(this, ServerNetError::SEND_ERROR);
+                            delegate->netDidFailWithError(this, ServerNetError::SOCKET_SEND_ERROR);
                         }
                     }
                 }
+
+
             });
+
+            std::unique_lock<std::shared_mutex> lock(clientsMutex);
+            clients.emplace_back(nextId(), acceptedSocket, clientThread);
         }
+
+        std::unique_lock<std::shared_mutex> lock(clientsMutex);
+        for (auto &client : clients) {
+            close(client.socket());
+            client.thread()->join();
+            delete client.thread();
+        }
+        clients.clear();
+
     });
+
+    acceptThread.join();
 }
 
 void ServerNet::stop() {
+    closeSocket(listeningSocket);
+}
 
+uint64_t ServerNet::nextId() noexcept {
+    return idCounter++;
+}
+
+void ServerNet::closeSocket(int socket) {
+    shutdown(socket, SHUT_RDWR);
+    close(socket);
+}
+
+void ServerNet::ioWantsToKillClientWithId(ServerIO *io, uint64_t id) {
+    std::unique_lock<std::shared_mutex> lock(clientsMutex);
+    auto toBeRemoved = std::find_if(clients.cbegin(), clients.cend(), [id](const ClientSession &client) -> bool {
+        return client.id() == id;
+    });
+
+    if (toBeRemoved.base() != nullptr) {
+        closeSocket(toBeRemoved->socket());
+        toBeRemoved->thread()->join();
+    } else if (delegate != nullptr) {
+        delegate->netDidFailWithError(this, ServerNetError::KILL_CLIENT_ERROR);
+    }
+
+    clients.erase(toBeRemoved);
+}
+
+std::vector<ClientSession> ServerNet::ioWantsToListClients(ServerIO *io) {
+    std::shared_lock<std::shared_mutex> lock(clientsMutex);
+    auto clientsCopy = clients;
+    lock.unlock();
+    return clientsCopy;
+}
+
+void ServerNet::ioWantsToExit(ServerIO *io) {
+    closeSocket(listeningSocket);
 }
