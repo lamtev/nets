@@ -11,6 +11,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
+#include <Message.h>
 #include <Operation.h>
 
 //TODO: Google test
@@ -45,6 +46,11 @@ int main(int argc, char **argv) {
     std::cout << *f << std::endl;
 
     delete[] b;
+
+    auto mt = MessageType(0x05);
+    auto ui8 = uint8_t(mt);
+    std::cout << ui8 << std::endl;
+
 
     return 0;
 }

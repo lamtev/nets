@@ -39,25 +39,16 @@ Operation::Operation(OperationType type, int64_t operand1) noexcept {
 }
 
 Operation *Operation::of(uint8_t *bytes) {
-    switch (bytes[0]) {
-    case 0x00: {
-        return new Operation(OperationType::ADDITION, bytesAsInt64(&bytes[1]), bytesAsInt64(&bytes[9]));
-    }
-    case 0x01: {
-        return new Operation(OperationType::SUBTRACTION, bytesAsInt64(&bytes[1]), bytesAsInt64(&bytes[9]));
-    }
-    case 0x02: {
-        return new Operation(OperationType::MULTIPLICATION, bytesAsInt64(&bytes[1]), bytesAsInt64(&bytes[9]));
-    }
-    case 0x03: {
-        return new Operation(OperationType::DIVISION, bytesAsInt64(&bytes[1]), bytesAsInt64(&bytes[9]));
-    }
-    case 0x04: {
-        return new Operation(OperationType::SQUARE_ROOT, bytesAsInt64(&bytes[1]));
-    }
-    case 0x05: {
-        return new Operation(OperationType::FACTORIAL, bytesAsInt64(&bytes[1]));
-    }
+    auto operationType = OperationType(bytes[0]);
+    switch (operationType) {
+    case OperationType::ADDITION:
+    case OperationType::SUBTRACTION:
+    case OperationType::MULTIPLICATION:
+    case OperationType::DIVISION:
+        return new Operation(operationType, bytesAsInt64(&bytes[1]), bytesAsInt64(&bytes[9]));
+    case OperationType::SQUARE_ROOT:
+    case OperationType::FACTORIAL:
+        return new Operation(operationType, bytesAsInt64(&bytes[1]));
     default:
         return nullptr;
     }
@@ -69,52 +60,27 @@ uint8_t *Operation::toBytes() const {
     }
 
     switch (_type) {
-    case OperationType::ADDITION: {
-        auto *bytes = new unsigned char[17];
-        bytes[0] = 0x00;
-        int64AsBytes(_operand1, &bytes[1]);
-        int64AsBytes(_operand2, &bytes[9]);
-
-        return bytes;
-    }
-    case OperationType::SUBTRACTION: {
-        auto *bytes = new unsigned char[17];
-        bytes[0] = 0x01;
-        int64AsBytes(_operand1, &bytes[1]);
-        int64AsBytes(_operand2, &bytes[9]);
-
-        return bytes;
-    }
-    case OperationType::MULTIPLICATION: {
-        auto *bytes = new unsigned char[17];
-        bytes[0] = 0x02;
-        int64AsBytes(_operand1, &bytes[1]);
-        int64AsBytes(_operand2, &bytes[9]);
-
-        return bytes;
-    }
+    case OperationType::ADDITION:
+    case OperationType::SUBTRACTION:
+    case OperationType::MULTIPLICATION:
     case OperationType::DIVISION: {
         auto *bytes = new unsigned char[17];
-        bytes[0] = 0x03;
+        bytes[0] = uint8_t(_type);
         int64AsBytes(_operand1, &bytes[1]);
         int64AsBytes(_operand2, &bytes[9]);
 
         return bytes;
     }
-    case OperationType::SQUARE_ROOT: {
-        auto *bytes = new unsigned char[9];
-        bytes[0] = 0x04;
-        int64AsBytes(_operand1, &bytes[1]);
-
-        return bytes;
-    }
+    case OperationType::SQUARE_ROOT:
     case OperationType::FACTORIAL: {
         auto *bytes = new unsigned char[9];
-        bytes[0] = 0x05;
+        bytes[0] = uint8_t(_type);
         int64AsBytes(_operand1, &bytes[1]);
 
         return bytes;
     }
+    default:
+        return nullptr;
     }
 }
 

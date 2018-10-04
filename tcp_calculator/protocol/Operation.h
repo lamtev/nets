@@ -9,13 +9,13 @@
 #include <cstdint>
 
 
-enum class OperationType {
-    ADDITION = 0,
-    SUBTRACTION,
-    MULTIPLICATION,
-    DIVISION,
-    SQUARE_ROOT,
-    FACTORIAL
+enum class OperationType : uint8_t {
+    ADDITION = 0x00,
+    SUBTRACTION = 0x01,
+    MULTIPLICATION = 0x02,
+    DIVISION = 0x03,
+    SQUARE_ROOT = 0x04,
+    FACTORIAL = 0x05,
 };
 
 class Operation {
