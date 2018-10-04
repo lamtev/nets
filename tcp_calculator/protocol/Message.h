@@ -7,6 +7,7 @@
 
 #include <cstdint>
 
+
 enum class MessageType {
     MATH_REQUEST = 0,
     MATH_RESPONSE,
@@ -22,13 +23,17 @@ class Message {
     uint8_t *_data;
 
  public:
-    Message(MessageType type, uint8_t dataSize, uint8_t *data) : _type(type), _dataSize(dataSize), _data(data) {}
+    Message(MessageType type, uint8_t dataSize, uint8_t *data);
 
-    MessageType type() const { return _type; }
+    static Message *of(uint8_t *bytes);
 
-    uint8_t dataSize() const { return _dataSize; }
+    uint8_t *toBytes();
 
-    uint8_t *data() const { return _data; }
+    MessageType type() const;
+
+    uint8_t dataSize() const;
+
+    uint8_t *data() const;
 
 };
 

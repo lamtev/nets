@@ -15,6 +15,7 @@
 class ServerNetDelegate;
 class Message;
 
+
 class ServerNet : public ServerIODelegate {
  private:
     const uint16_t port;

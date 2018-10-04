@@ -9,7 +9,6 @@
 #include <unistd.h>
 
 #include <nets_lib/receivenbytes.h>
-#include <protocol/CalculatorProtocol.h>
 #include <protocol/Message.h>
 #include <protocol/Operation.h>
 #include <protocol/BitsUtils.h>
@@ -97,12 +96,12 @@ void ServerNet::start() {
                         break;
                     }
 
-                    auto request = CalculatorProtocol::decode(bytes);
+                    auto request = Message::of(bytes);
 
                     //TODO: handle message
                     auto response = handleRequest(request);
 
-                    auto bytesToBeSent = CalculatorProtocol::encode(response);
+                    auto bytesToBeSent = response->toBytes();
                     delete[] response->data();
                     delete response;
                     delete request;
@@ -191,9 +190,12 @@ Message *ServerNet::handleRequest(Message *request) {
         int64AsBytes(res, data);
         break;
     }
-        //TODO: handle other message types
-    default:
+    case MessageType::CONTROL_REQUEST: {
+        
         break;
+    }
+    default:
+        return nullptr;
     }
 
     return new Message(responseType, dataSize, data);
@@ -208,17 +210,15 @@ void ServerNet::ioWantsToKillClientWithId(ServerIO *io, uint64_t id) {
     if (toBeRemoved.base() != nullptr) {
         closeSocket(toBeRemoved->socket());
         toBeRemoved->thread()->join();
+        clients.erase(toBeRemoved);
     } else if (delegate != nullptr) {
         delegate->netDidFailWithError(this, ServerNetError::KILL_CLIENT_ERROR);
     }
-
-    clients.erase(toBeRemoved);
 }
 
 std::vector<ClientSession> ServerNet::ioWantsToListClients(ServerIO *io) {
     std::shared_lock<std::shared_mutex> lock(clientsMutex);
     auto clientsCopy = clients;
-    lock.unlock();
     return clientsCopy;
 }
 

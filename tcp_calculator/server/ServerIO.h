@@ -11,8 +11,8 @@
 #include "ServerNetDelegate.h"
 
 class ServerIODelegate;
-
 class ClientSession;
+
 
 class ServerIO : public ServerNetDelegate {
  private:
