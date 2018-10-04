@@ -13,10 +13,6 @@
 
 #include <Operation.h>
 
-void fun (char *a, int n) {
-
-}
-
 //TODO: Google test
 int main(int argc, char **argv) {
     std::vector<OperationType> twoOperandsOps = {
@@ -49,8 +45,6 @@ int main(int argc, char **argv) {
     std::cout << *f << std::endl;
 
     delete[] b;
-
-
 
     return 0;
 }

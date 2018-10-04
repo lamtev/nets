@@ -8,13 +8,13 @@
 
 #include <cstdint>
 
-inline void int64AsBytes(int64_t _long, uint8_t *bytes) {
+inline void int64AsBytes(int64_t int64, uint8_t *bytes) {
     for (auto i = 0; i < 8; ++i) {
-        bytes[7 - i] = (unsigned char) (_long >> (i << 3));
+        bytes[7 - i] = (unsigned char) (int64 >> (i << 3));
     }
 }
 
-inline long bytesAsLong(const uint8_t *bytes) {
+inline int64_t bytesAsInt64(const uint8_t *bytes) {
     return (((int64_t) bytes[0]) << 56 |
             ((int64_t) bytes[1]) << 48 |
             ((int64_t) bytes[2]) << 40 |

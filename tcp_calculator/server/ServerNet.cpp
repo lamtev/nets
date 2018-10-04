@@ -159,7 +159,7 @@ Message *ServerNet::handleRequest(Message *request) {
     uint8_t dataSize;
     uint8_t *data;
     switch (request->type()) {
-    case MessageType::MATH_RESPONSE: {
+    case MessageType::MATH_REQUEST: {
         auto operation = Operation::of(request->data());
         responseType = MessageType::MATH_RESPONSE;
         int64_t res;
@@ -218,8 +218,7 @@ void ServerNet::ioWantsToKillClientWithId(ServerIO *io, uint64_t id) {
 
 std::vector<ClientSession> ServerNet::ioWantsToListClients(ServerIO *io) {
     std::shared_lock<std::shared_mutex> lock(clientsMutex);
-    auto clientsCopy = clients;
-    return clientsCopy;
+    return clients;
 }
 
 void ServerNet::ioWantsToExit(ServerIO *io) {
