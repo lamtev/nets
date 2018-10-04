@@ -41,22 +41,22 @@ Operation::Operation(OperationType type, int64_t operand1) noexcept {
 Operation *Operation::of(uint8_t *bytes) {
     switch (bytes[0]) {
     case 0x00: {
-        return new Operation(OperationType::ADDITION, bytesAsLong(&bytes[1]), bytesAsLong(&bytes[9]));
+        return new Operation(OperationType::ADDITION, bytesAsInt64(&bytes[1]), bytesAsInt64(&bytes[9]));
     }
     case 0x01: {
-        return new Operation(OperationType::SUBTRACTION, bytesAsLong(&bytes[1]), bytesAsLong(&bytes[9]));
+        return new Operation(OperationType::SUBTRACTION, bytesAsInt64(&bytes[1]), bytesAsInt64(&bytes[9]));
     }
     case 0x02: {
-        return new Operation(OperationType::MULTIPLICATION, bytesAsLong(&bytes[1]), bytesAsLong(&bytes[9]));
+        return new Operation(OperationType::MULTIPLICATION, bytesAsInt64(&bytes[1]), bytesAsInt64(&bytes[9]));
     }
     case 0x03: {
-        return new Operation(OperationType::DIVISION, bytesAsLong(&bytes[1]), bytesAsLong(&bytes[9]));
+        return new Operation(OperationType::DIVISION, bytesAsInt64(&bytes[1]), bytesAsInt64(&bytes[9]));
     }
     case 0x04: {
-        return new Operation(OperationType::SQUARE_ROOT, bytesAsLong(&bytes[1]));
+        return new Operation(OperationType::SQUARE_ROOT, bytesAsInt64(&bytes[1]));
     }
     case 0x05: {
-        return new Operation(OperationType::FACTORIAL, bytesAsLong(&bytes[1]));
+        return new Operation(OperationType::FACTORIAL, bytesAsInt64(&bytes[1]));
     }
     default:
         return nullptr;
@@ -149,18 +149,25 @@ std::string Operation::toString() const noexcept {
     if (!_isValid) {
         return "";
     }
+
+    std::string op;
     switch (_type) {
     case OperationType::ADDITION:
-        return std::string("Operation{ ") + std::to_string(_operand1) + " + " + std::to_string(_operand2) + " }";
+        op = "+";
+        break;
     case OperationType::SUBTRACTION:
-        return std::string("Operation{ ") + std::to_string(_operand1) + " - " + std::to_string(_operand2) + " }";
+        op = "-";
+        break;
     case OperationType::MULTIPLICATION:
-        return std::string("Operation{ ") + std::to_string(_operand1) + " * " + std::to_string(_operand2) + " }";
+        op = "*";
+        break;
     case OperationType::DIVISION:
-        return std::string("Operation{ ") + std::to_string(_operand1) + " / " + std::to_string(_operand2) + " }";
+        op = "/";
+        break;
     case OperationType::SQUARE_ROOT:
         return std::string("Operation{ ") + "√" + std::to_string(_operand1) + " }";
     case OperationType::FACTORIAL:
         return std::string("Operation{ ") + std::to_string(_operand1) + "! }";
     }
+    return std::string("Operation{ ") + std::to_string(_operand1) + op + std::to_string(_operand2) + " }";
 }

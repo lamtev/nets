@@ -8,12 +8,12 @@
 #include <cstdint>
 
 
-enum class MessageType {
-    MATH_REQUEST = 0,
-    MATH_RESPONSE,
-    CONTROL_REQUEST,
-    CONTROL_RESPONSE,
-    SERVER_INITIATED_REQUEST,
+enum class MessageType: uint8_t {
+    MATH_REQUEST = 0x00,
+    MATH_RESPONSE = 0x01,
+    CONTROL_REQUEST = 0x02,
+    CONTROL_RESPONSE = 0x03,
+    SERVER_INITIATED_REQUEST = 0x04,
 };
 
 class Message {
