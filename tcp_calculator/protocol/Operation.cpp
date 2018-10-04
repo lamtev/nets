@@ -15,7 +15,7 @@ Operation::Operation(OperationType type, int64_t operand1, int64_t operand2) noe
         _type = type;
         _operand1 = operand1;
         _operand2 = operand2;
-        _nBytes = 17;
+        _nBytes = TWO_OPERAND_OPERATION_LENGTH;
         _isValid = true;
         break;
     default:
@@ -30,7 +30,7 @@ Operation::Operation(OperationType type, int64_t operand1) noexcept {
         _type = type;
         _operand1 = operand1;
         _operand2 = 0;
-        _nBytes = 9;
+        _nBytes = ONE_OPERAND_OPERATION_LENGTH;
         _isValid = true;
         break;
     default:
@@ -64,7 +64,7 @@ uint8_t *Operation::toBytes() const {
     case OperationType::SUBTRACTION:
     case OperationType::MULTIPLICATION:
     case OperationType::DIVISION: {
-        auto *bytes = new unsigned char[17];
+        auto *bytes = new unsigned char[TWO_OPERAND_OPERATION_LENGTH];
         bytes[0] = uint8_t(_type);
         int64AsBytes(_operand1, &bytes[1]);
         int64AsBytes(_operand2, &bytes[9]);
@@ -73,7 +73,7 @@ uint8_t *Operation::toBytes() const {
     }
     case OperationType::SQUARE_ROOT:
     case OperationType::FACTORIAL: {
-        auto *bytes = new unsigned char[9];
+        auto *bytes = new unsigned char[ONE_OPERAND_OPERATION_LENGTH];
         bytes[0] = uint8_t(_type);
         int64AsBytes(_operand1, &bytes[1]);
 

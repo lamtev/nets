@@ -25,6 +25,8 @@ class Operation {
     int64_t _operand2;
     bool _isValid;
     uint8_t _nBytes;
+    static const uint8_t TWO_OPERAND_OPERATION_LENGTH = 2 * sizeof(int64_t) + 1;
+    static const uint8_t ONE_OPERAND_OPERATION_LENGTH = sizeof(int64_t) + 1;
 
  public:
     Operation(OperationType type, int64_t operand1, int64_t operand2) noexcept;
