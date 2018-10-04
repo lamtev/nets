@@ -5,6 +5,39 @@
 #include "Operation.h"
 #include "BitsUtils.h"
 
+
+Operation::Operation(OperationType type, int64_t operand1, int64_t operand2) noexcept {
+    switch (type) {
+    case OperationType::ADDITION:
+    case OperationType::SUBTRACTION:
+    case OperationType::MULTIPLICATION:
+    case OperationType::DIVISION:
+        _type = type;
+        _operand1 = operand1;
+        _operand2 = operand2;
+        _nBytes = 17;
+        _isValid = true;
+        break;
+    default:
+        _isValid = false;
+    }
+}
+
+Operation::Operation(OperationType type, int64_t operand1) noexcept {
+    switch (type) {
+    case OperationType::SQUARE_ROOT:
+    case OperationType::FACTORIAL:
+        _type = type;
+        _operand1 = operand1;
+        _operand2 = 0;
+        _nBytes = 9;
+        _isValid = true;
+        break;
+    default:
+        _isValid = false;
+    }
+}
+
 Operation *Operation::of(uint8_t *bytes) {
     switch (bytes[0]) {
     case 0x00: {
@@ -87,38 +120,6 @@ uint8_t *Operation::toBytes() const {
 
 uint8_t Operation::nBytes() const noexcept {
     return _nBytes;
-}
-
-Operation::Operation(OperationType type, int64_t operand1, int64_t operand2) noexcept {
-    switch (type) {
-    case OperationType::ADDITION:
-    case OperationType::SUBTRACTION:
-    case OperationType::MULTIPLICATION:
-    case OperationType::DIVISION:
-        _type = type;
-        _operand1 = operand1;
-        _operand2 = operand2;
-        _nBytes = 17;
-        _isValid = true;
-        break;
-    default:
-        _isValid = false;
-    }
-}
-
-Operation::Operation(OperationType type, int64_t operand1) noexcept {
-    switch (type) {
-    case OperationType::SQUARE_ROOT:
-    case OperationType::FACTORIAL:
-        _type = type;
-        _operand1 = operand1;
-        _operand2 = 0;
-        _nBytes = 9;
-        _isValid = true;
-        break;
-    default:
-        _isValid = false;
-    }
 }
 
 bool Operation::isValid() const noexcept {

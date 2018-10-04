@@ -11,6 +11,7 @@
 class ServerIO;
 class ClientSession;
 
+
 class ServerIODelegate {
  public:
     virtual void ioWantsToKillClientWithId(ServerIO *io, uint64_t id) = 0;

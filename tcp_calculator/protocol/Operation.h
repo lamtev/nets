@@ -8,6 +8,7 @@
 #include <string>
 #include <cstdint>
 
+
 enum class OperationType {
     ADDITION = 0,
     SUBTRACTION,
@@ -26,6 +27,9 @@ class Operation {
     uint8_t _nBytes;
 
  public:
+    Operation(OperationType type, int64_t operand1, int64_t operand2) noexcept;
+
+    Operation(OperationType type, int64_t operand1) noexcept;
 
     /**
      *
@@ -56,11 +60,6 @@ class Operation {
     bool equals(const Operation &operation) const noexcept;
 
     std::string toString() const noexcept;
-
- private:
-    Operation(OperationType type, int64_t operand1, int64_t operand2) noexcept;
-
-    Operation(OperationType type, int64_t operand1) noexcept;
 };
 
 
