@@ -8,7 +8,10 @@
 #include <cstdint>
 
 
-enum class MessageType: uint8_t {
+/**
+ * Represents message type codes
+ */
+enum class MessageType : uint8_t {
     MATH_REQUEST = 0x00,
     MATH_RESPONSE = 0x01,
     CONTROL_REQUEST = 0x02,
@@ -16,6 +19,20 @@ enum class MessageType: uint8_t {
     SERVER_INITIATED_REQUEST = 0x04,
 };
 
+/**
+ *
+ * Encapsulates binary message.
+ *
+ * Binary message representation format:
+ *
+ *  --------------- -------------- --------
+ * | Data size (N) | Message type |  Data  |
+ *  --------------- -------------- --------
+ *     1 byte          1 byte      N bytes
+ *
+ * @see MessageType
+ *
+ */
 class Message {
  private:
     MessageType _type;
@@ -34,6 +51,8 @@ class Message {
     uint8_t dataSize() const;
 
     uint8_t *data() const;
+
+    uint8_t size() const;
 
 };
 

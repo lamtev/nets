@@ -28,29 +28,31 @@ int main(int argc, char **argv) {
             OperationType::FACTORIAL,
     };
 
-    std::cout << "All tests passed" << std::endl;
+    for (long i = -std::numeric_limits<long>::min() / 2; i < std::numeric_limits<long>::max() / 2; i+=97) {
+        for (const auto &opt : twoOperandsOps) {
+            auto op = Operation(opt, i, std::numeric_limits<long>::max() / 2 - abs(i));
+            auto message = new Message(MessageType::MATH_REQUEST, op.nBytes(), op.toBytes());
+            auto bytes = message->toBytes();
 
-    int64_t a = 0x7FFFFFFFFFFFFFFE;
-    auto b = new int64_t[1];
-    *b = a;
+            auto message2 = Message::of(bytes);
+            auto op2 = Operation::of(message2->data());
 
-    auto c = reinterpret_cast<int8_t *>(&a);
-    std::cout << (uint32_t) c[0] << "|" << (uint32_t) c[1] << "|" << (uint32_t) c[2] << "|" << (uint32_t) c[3] << std::endl;
-    auto d = reinterpret_cast<int8_t *>(b);
-    std::cout << (uint32_t) d[0] << "|" << (uint32_t) d[1] << "|" << (uint32_t) d[2] << "|" << (uint32_t) d[3] << std::endl;
+            delete[] message->data();
+            delete message;
+            delete[] bytes;
+            delete message2;
 
-    auto e = reinterpret_cast<int64_t *>(c);
-    auto f = reinterpret_cast<int64_t *>(d);
+            if (!op2->equals(op)) {
+                std::cout << "Operations are not equal" << std::endl;
+            }
 
-    std::cout << *e << std::endl;
-    std::cout << *f << std::endl;
+            delete op2;
+        }
 
-    delete[] b;
+        for (const auto &opt : singleOperandOps) {
 
-    auto mt = MessageType(0x05);
-    auto ui8 = uint8_t(mt);
-    std::cout << ui8 << std::endl;
-
+        }
+    }
 
     return 0;
 }

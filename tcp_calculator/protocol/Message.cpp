@@ -33,3 +33,7 @@ uint8_t Message::dataSize() const {
 uint8_t *Message::data() const {
     return _data;
 }
+
+uint8_t Message::size() const {
+    return _dataSize + 2 * sizeof(uint8_t);
+}
