@@ -75,8 +75,9 @@ void ServerNet::start() {
 
             auto clientThread = new std::thread([acceptedSocket, this]() {
                 while (true) {
-                    uint8_t bytesToBeReceived;
-                    ssize_t bytesReceived = recv(acceptedSocket, &bytesToBeReceived, 1, 0);
+                    uint8_t bytesInData;
+                    ssize_t bytesReceived = recv(acceptedSocket, &bytesInData, 1, 0);
+                    uint8_t bytesToBeReceived = bytesInData + uint8_t(1);
 
                     if (bytesReceived == -1 || bytesReceived == 0) {
                         if (delegate != nullptr) {
@@ -85,10 +86,10 @@ void ServerNet::start() {
                         break;
                     }
 
-                    auto bytes = new uint8_t[bytesToBeReceived + 1];
-                    bytes[0] = bytesToBeReceived;
+                    auto bytes = new uint8_t[bytesToBeReceived];
+                    bytes[0] = bytesInData;
 
-                    bytesReceived = receiveNBytes(acceptedSocket, bytesToBeReceived, bytes);
+                    bytesReceived = receiveNBytes(acceptedSocket, bytesInData, &bytes[1]);
                     if (bytesReceived == -1 || bytesReceived == 0) {
                         if (delegate != nullptr) {
                             delegate->netDidFailWithError(this, ServerNetError::SOCKET_RECEIVE_ERROR);
@@ -101,17 +102,18 @@ void ServerNet::start() {
                     //TODO: handle message
                     auto response = handleRequest(request);
 
+
                     auto bytesToBeSent = response->toBytes();
                     delete[] response->data();
-                    delete response;
                     delete request;
                     delete[] bytes;
 
 #ifdef __APPLE__
-                    ssize_t bytesSent = send(acceptedSocket, bytesToBeSent, bytesToBeSent[0] + 1, 0);
+                    ssize_t bytesSent = send(acceptedSocket, bytesToBeSent, response->size(), 0);
 #else
                     ssize_t bytesSent = send(acceptedSocket, bytesToBeSent, bytesToBeSent[0] + 1, MSG_NOSIGNAL);
 #endif
+                    delete response;
                     delete[] bytesToBeSent;
 
                     if (bytesSent == -1) {
@@ -120,7 +122,6 @@ void ServerNet::start() {
                         }
                     }
                 }
-
 
             });
 
@@ -191,7 +192,14 @@ Message *ServerNet::handleRequest(Message *request) {
         break;
     }
     case MessageType::CONTROL_REQUEST: {
-        
+        if (*request->data() == 0x00) {
+            data = new uint8_t[1];
+            *data = 0x00;
+            dataSize = 1;
+            responseType = MessageType::CONTROL_RESPONSE;
+        } else {
+            return nullptr;
+        }
         break;
     }
     default:

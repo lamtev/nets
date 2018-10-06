@@ -30,6 +30,7 @@ class ServerNet : public ServerIODelegate {
     void setDelegate(ServerNetDelegate *delegate);
     void start();
     void stop();
+    
     void ioWantsToKillClientWithId(ServerIO *io, uint64_t id) override;
     std::vector<ClientSession> ioWantsToListClients(ServerIO *io) override;
     void ioWantsToExit(ServerIO *io) override;
