@@ -18,6 +18,19 @@ enum class OperationType : uint8_t {
     FACTORIAL = 0x05,
 };
 
+/**
+ * Encapsulates operation binary representation.
+ *
+ * Operation binary format:
+ *
+ *  --------------------------------
+ * | Operation type |     Data     |
+ * --------------------------------
+ *      1 byte      8 or 16 bytes
+ *
+ * Data consists of 8 bytes if operation has 1 operand and 16 bytes - otherwise
+ *
+ */
 class Operation {
  private:
     OperationType _type;
@@ -25,8 +38,6 @@ class Operation {
     int64_t _operand2;
     bool _isValid;
     uint8_t _nBytes;
-    static const uint8_t TWO_OPERAND_OPERATION_LENGTH = 2 * sizeof(int64_t) + 1;
-    static const uint8_t ONE_OPERAND_OPERATION_LENGTH = sizeof(int64_t) + 1;
 
  public:
     Operation(OperationType type, int64_t operand1, int64_t operand2) noexcept;

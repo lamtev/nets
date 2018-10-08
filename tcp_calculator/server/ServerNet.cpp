@@ -12,12 +12,14 @@
 #include <protocol/Message.h>
 #include <protocol/Operation.h>
 #include <protocol/BitsUtils.h>
+#include <protocol/MathResponse.h>
+#include <cmath>
 
 #include "ServerNet.h"
 #include "ServerNetError.h"
 #include "ClientSession.h"
 #include "ServerNetDelegate.h"
-
+#include "MathUtils.h"
 
 ServerNet::ServerNet(uint16_t port) : port(port), clients(), clientsMutex(), idCounter(0) {
 }
@@ -73,18 +75,18 @@ void ServerNet::start() {
                 }
             }
 
-            auto clientThread = new std::thread([acceptedSocket, this]() {
+            u_int64_t clientId = nextId();
+            auto clientThread = new std::thread([acceptedSocket, this, clientId]() {
                 while (true) {
                     uint8_t bytesInData;
                     ssize_t bytesReceived = recv(acceptedSocket, &bytesInData, 1, 0);
-                    uint8_t bytesToBeReceived = bytesInData + uint8_t(1);
-
                     if (bytesReceived == -1 || bytesReceived == 0) {
                         if (delegate != nullptr) {
                             delegate->netDidFailWithError(this, ServerNetError::SOCKET_RECEIVE_ERROR);
                         }
                         break;
                     }
+                    uint8_t bytesToBeReceived = bytesInData + uint8_t(1);
 
                     auto bytes = new uint8_t[bytesToBeReceived];
                     bytes[0] = bytesInData;
@@ -99,8 +101,7 @@ void ServerNet::start() {
 
                     auto request = Message::of(bytes);
 
-                    //TODO: handle message
-                    auto response = handleRequest(request);
+                    auto response = handleRequest(request, acceptedSocket);
 
 
                     auto bytesToBeSent = response->toBytes();
@@ -111,7 +112,7 @@ void ServerNet::start() {
 #ifdef __APPLE__
                     ssize_t bytesSent = send(acceptedSocket, bytesToBeSent, response->size(), 0);
 #else
-                    ssize_t bytesSent = send(acceptedSocket, bytesToBeSent, bytesToBeSent[0] + 1, MSG_NOSIGNAL);
+                    ssize_t bytesSent = send(acceptedSocket, bytesToBeSent, response->size(), MSG_NOSIGNAL);
 #endif
                     delete response;
                     delete[] bytesToBeSent;
@@ -122,11 +123,11 @@ void ServerNet::start() {
                         }
                     }
                 }
-
+//                ioWantsToKillClientWithId(nullptr, clientId);
             });
 
             std::unique_lock<std::shared_mutex> lock(clientsMutex);
-            clients.emplace_back(nextId(), acceptedSocket, clientThread);
+            clients.emplace_back(clientId, acceptedSocket, clientThread);
         }
 
         std::unique_lock<std::shared_mutex> lock(clientsMutex);
@@ -137,6 +138,10 @@ void ServerNet::start() {
         }
         clients.clear();
 
+        for (auto th : hardOperationThreadPool) {
+            th->join();
+            delete th;
+        }
     });
 
     acceptThread.join();
@@ -155,7 +160,7 @@ void ServerNet::closeSocket(int socket) {
     close(socket);
 }
 
-Message *ServerNet::handleRequest(Message *request) {
+Message *ServerNet::handleRequest(Message *request, int socket) {
     MessageType responseType;
     uint8_t dataSize;
     uint8_t *data;
@@ -164,31 +169,46 @@ Message *ServerNet::handleRequest(Message *request) {
         auto operation = Operation::of(request->data());
         responseType = MessageType::MATH_RESPONSE;
         int64_t res;
+        MathResponseType mathResponseType;
         switch (operation->type()) {
-        case OperationType::ADDITION: {
+        case OperationType::ADDITION:
             res = operation->operand1() + operation->operand2();
+            mathResponseType = MathResponseType::FAST_OPERATION_RESULT;
             break;
-        }
-        case OperationType::SUBTRACTION: {
+        case OperationType::SUBTRACTION:
             res = operation->operand1() - operation->operand2();
+            mathResponseType = MathResponseType::FAST_OPERATION_RESULT;
             break;
-        }
-        case OperationType::MULTIPLICATION: {
+        case OperationType::MULTIPLICATION:
             res = operation->operand1() * operation->operand2();
+            mathResponseType = MathResponseType::FAST_OPERATION_RESULT;
             break;
-        }
         case OperationType::DIVISION: {
-            res = operation->operand1() / operation->operand2();
+            auto op2 = operation->operand2();
+            if (op2 == 0) {
+                res = 0;
+                mathResponseType = MathResponseType::BAD_OPERATION;
+            } else {
+                res = operation->operand1() / op2;
+                mathResponseType = MathResponseType::FAST_OPERATION_RESULT;
+            }
             break;
         }
+        case OperationType::FACTORIAL:
+        case OperationType::SQUARE_ROOT:
+            res = 0;
+            mathResponseType = MathResponseType::HARD_OPERATION_SUBMITTED;
+            submitHardOperation(*operation, 0);
+            break;
         default:
             res = 0;
+            mathResponseType = MathResponseType::BAD_OPERATION;
             break;
         }
         delete operation;
-        dataSize = 8;
-        data = new uint8_t[dataSize];
-        int64AsBytes(res, data);
+        MathResponse mathResponse = MathResponse(mathResponseType, res);
+        dataSize = mathResponse.size();
+        data = mathResponse.toBytes();
         break;
     }
     case MessageType::CONTROL_REQUEST: {
@@ -207,6 +227,43 @@ Message *ServerNet::handleRequest(Message *request) {
     }
 
     return new Message(responseType, dataSize, data);
+}
+
+void ServerNet::submitHardOperation(Operation operation, int socket) {
+    //TODO: GNU Multi-Precision Library
+    std::lock_guard<std::mutex> lock(hardOperationThreadPoolMutex);
+    auto hardOperationThread = new std::thread([this, operation, socket]() {
+        int64_t res;
+        switch (operation.type()) {
+        case OperationType::FACTORIAL:
+            res = factorial(static_cast<uint64_t>(operation.operand1()));
+            break;
+        case OperationType::SQUARE_ROOT:
+            res = static_cast<int64_t>(sqrt(operation.operand1()));
+            break;
+        default:
+            return;
+        }
+        auto *data = new uint8_t[8];
+        int64AsBytes(res, data);
+        auto result = Message(MessageType::SERVER_INITIATED_REQUEST, 8, data);
+        auto bytes = result.toBytes();
+#ifdef __APPLE__
+        ssize_t bytesSent = send(socket, bytes, result.size(), 0);
+#else
+        ssize_t bytesSent = send(socket, bytes, result.size(), MSG_NOSIGNAL);
+#endif
+
+        if (bytesSent == -1) {
+            if (delegate != nullptr) {
+                delegate->netDidFailWithError(this, ServerNetError::SOCKET_SEND_ERROR);
+            }
+        }
+
+        delete[] data;
+        delete[] bytes;
+    });
+    hardOperationThreadPool.push_back(hardOperationThread);
 }
 
 void ServerNet::ioWantsToKillClientWithId(ServerIO *io, uint64_t id) {

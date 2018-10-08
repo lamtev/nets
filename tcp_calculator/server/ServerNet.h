@@ -14,6 +14,7 @@
 
 class ServerNetDelegate;
 class Message;
+class Operation;
 
 
 class ServerNet : public ServerIODelegate {
@@ -24,6 +25,9 @@ class ServerNet : public ServerIODelegate {
     std::vector<ClientSession> clients;
     std::shared_mutex clientsMutex;
     std::atomic<uint64_t> idCounter;
+
+    std::mutex hardOperationThreadPoolMutex;
+    std::vector<std::thread *> hardOperationThreadPool;
 
  public:
     explicit ServerNet(uint16_t port);
@@ -38,7 +42,8 @@ class ServerNet : public ServerIODelegate {
  private:
     uint64_t nextId() noexcept;
     static void closeSocket(int socket);
-    Message *handleRequest(Message *request);
+    Message *handleRequest(Message *request, int socket);
+    void submitHardOperation(Operation operation, int socket);
 };
 
 
