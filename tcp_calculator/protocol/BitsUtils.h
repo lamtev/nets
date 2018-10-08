@@ -5,8 +5,8 @@
 #ifndef NETS_BITSUTILS_H
 #define NETS_BITSUTILS_H
 
-
 #include <cstdint>
+
 
 inline void int64AsBytes(int64_t int64, uint8_t *bytes) {
     for (auto i = 0; i < 8; ++i) {

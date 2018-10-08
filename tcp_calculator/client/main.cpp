@@ -11,9 +11,14 @@
 
 #include <nets_lib/receivenbytes.h>
 #include <protocol/BitsUtils.h>
+#include <protocol/MathResponse.h>
+#include <protocol/Message.h>
+#include <protocol/Operation.h>
 
 #include "main.h"
 
+
+//TODO: send and receive in different threads
 int main(int argc, char **argv) {
     sockaddr_in peer{};
     peer.sin_family = AF_INET;
@@ -35,16 +40,15 @@ int main(int argc, char **argv) {
         std::string instruction;
         std::getline(std::cin, instruction);
 
-        auto message = messageWithInstruction(instruction);
+        auto request = requestWithInstruction(instruction);
 
-
-        if (message == nullptr) {
+        if (request == nullptr) {
             std::cerr << "Invalid instruction" << std::endl;
             continue;
         }
 
-        uint8_t *messageBytes = message->toBytes();
-        if (send(_socket, (const void *) messageBytes, message->size(), 0) <= 0) {
+        uint8_t *messageBytes = request->toBytes();
+        if (send(_socket, (const void *) messageBytes, request->size(), 0) <= 0) {
             std::cerr << "Unable to send: " << strerror(errno) << std::endl;
             break;
         }
@@ -66,18 +70,33 @@ int main(int argc, char **argv) {
             std::cerr << "Unable to receive: " << strerror(errno) << std::endl;
             continue;
         }
-        delete message;
+        delete request;
 
-        auto msg = Message::of(bytes);
+        auto response = Message::of(bytes);
 
-        std::cout << bytesAsInt64(msg->data()) << std::endl;
+        switch (MathResponse::typeOf(response->data())) {
+        case MathResponseType::FAST_OPERATION_RESULT: {
+            std::cout << MathResponse::resultOf(response->data()) << std::endl;
+            break;
+        }
+        case MathResponseType::BAD_OPERATION:
+            std::cout << "Bad operation" << std::endl;
+            break;
+        case MathResponseType::HARD_OPERATION_SUBMITTED:
+            std::cout << "Operation submitted" << std::endl;
+            break;
+        default:
+            break;
+        }
+
+        delete response;
         delete[] bytes;
     }
 
     return 0;
 }
 
-Message *messageWithInstruction(const std::string &instruction) {
+Message *requestWithInstruction(const std::string &instruction) {
     //TODO: check control commands first
     if (instruction == "kill me") {
         auto data = new uint8_t;

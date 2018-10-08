@@ -7,10 +7,8 @@
 
 #include <string>
 
-#include <protocol/Message.h>
-#include <protocol/Operation.h>
+class Message;
 
-
-Message *messageWithInstruction(const std::string &instruction);
+Message *requestWithInstruction(const std::string &instruction);
 
 #endif //NETS_MAIN_H

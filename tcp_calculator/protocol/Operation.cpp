@@ -6,6 +6,9 @@
 #include "BitsUtils.h"
 
 
+static const uint8_t TWO_OPERAND_OPERATION_LENGTH = 2 * sizeof(int64_t) + 1;
+static const uint8_t ONE_OPERAND_OPERATION_LENGTH = sizeof(int64_t) + 1;
+
 Operation::Operation(OperationType type, int64_t operand1, int64_t operand2) noexcept {
     switch (type) {
     case OperationType::ADDITION:
@@ -113,7 +116,7 @@ bool Operation::equals(const Operation &operation) const noexcept {
 
 std::string Operation::toString() const noexcept {
     if (!_isValid) {
-        return "";
+        return "InvalidOperation{}";
     }
 
     std::string op;
