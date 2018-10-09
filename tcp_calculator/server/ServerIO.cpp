@@ -62,6 +62,7 @@ void ServerIO::start() {
             }
         }
     }
+    int a = 0;
 }
 
 void ServerIO::stop() {
