@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <vector>
+#include <thread>
 
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -18,23 +19,70 @@
 #include "main.h"
 
 
-//TODO: send and receive in different threads
 int main(int argc, char **argv) {
     sockaddr_in peer{};
     peer.sin_family = AF_INET;
     peer.sin_port = htons(1234);
     peer.sin_addr.s_addr = inet_addr("127.0.0.1");
 
-    int _socket = socket(AF_INET, SOCK_STREAM, 0);
-    if (_socket < 0) {
+    int socket = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (socket < 0) {
         std::cerr << "Socket error: " << strerror(errno) << std::endl;
         return -1;
     }
 
-    if (connect(_socket, (sockaddr *) &peer, sizeof(peer)) != 0) {
+    if (connect(socket, (sockaddr *) &peer, sizeof(peer)) != 0) {
         std::cerr << "Unable to connect: " << strerror(errno) << std::endl;
         return -1;
     }
+
+    std::thread receiveThread([socket]() {
+        while (true) {
+            uint8_t bytesToBeReceived;
+            ssize_t bytesReceived = recv(socket, &bytesToBeReceived, 1, 0);
+
+            if (bytesReceived == -1 || bytesReceived == 0) {
+                std::cerr << "Unable to receive: " << strerror(errno) << std::endl;
+                break;
+            }
+
+            auto bytes = new uint8_t[bytesToBeReceived + 1];
+            bytes[0] = bytesToBeReceived;
+
+            bytesReceived = receiveNBytes(socket, bytesToBeReceived, &bytes[1]);
+            if (bytesReceived == -1 || bytesReceived == 0) {
+                std::cerr << "Unable to receive: " << strerror(errno) << std::endl;
+                break;
+            }
+
+            auto response = Message::of(bytes);
+            switch (response->type()) {
+            case MessageType::MATH_RESPONSE:
+                switch (MathResponse::typeOf(response->data())) {
+                case MathResponseType::FAST_OPERATION_RESULT: {
+                    std::cout << MathResponse::resultOf(response->data()) << std::endl;
+                    break;
+                }
+                case MathResponseType::BAD_OPERATION:
+                    std::cout << "Bad operation" << std::endl;
+                    break;
+                case MathResponseType::HARD_OPERATION_SUBMITTED:
+                    std::cout << "Operation submitted" << std::endl;
+                    break;
+                default:
+                    break;
+                }
+                break;
+            case MessageType::SERVER_INITIATED_REQUEST:
+                std::cout << bytesAsInt64(response->data()) << std::endl;
+                break;
+            default:
+                break;
+            }
+            delete response;
+            delete[] bytes;
+        }
+    });
 
     while (true) {
         std::string instruction;
@@ -48,50 +96,14 @@ int main(int argc, char **argv) {
         }
 
         uint8_t *messageBytes = request->toBytes();
-        if (send(_socket, (const void *) messageBytes, request->size(), 0) <= 0) {
+        if (send(socket, (const void *) messageBytes, request->size(), 0) <= 0) {
             std::cerr << "Unable to send: " << strerror(errno) << std::endl;
             break;
         }
         delete[] messageBytes;
-
-        uint8_t bytesToBeReceived;
-        ssize_t bytesReceived = recv(_socket, &bytesToBeReceived, 1, 0);
-
-        if (bytesReceived == -1 || bytesReceived == 0) {
-            std::cerr << "Unable to receive: " << strerror(errno) << std::endl;
-            continue;
-        }
-
-        auto bytes = new uint8_t[bytesToBeReceived + 1];
-        bytes[0] = bytesToBeReceived;
-
-        bytesReceived = receiveNBytes(_socket, bytesToBeReceived, &bytes[1]);
-        if (bytesReceived == -1 || bytesReceived == 0) {
-            std::cerr << "Unable to receive: " << strerror(errno) << std::endl;
-            continue;
-        }
         delete request;
-
-        auto response = Message::of(bytes);
-
-        switch (MathResponse::typeOf(response->data())) {
-        case MathResponseType::FAST_OPERATION_RESULT: {
-            std::cout << MathResponse::resultOf(response->data()) << std::endl;
-            break;
-        }
-        case MathResponseType::BAD_OPERATION:
-            std::cout << "Bad operation" << std::endl;
-            break;
-        case MathResponseType::HARD_OPERATION_SUBMITTED:
-            std::cout << "Operation submitted" << std::endl;
-            break;
-        default:
-            break;
-        }
-
-        delete response;
-        delete[] bytes;
     }
+    receiveThread.join();
 
     return 0;
 }

@@ -7,13 +7,15 @@
 #include <iostream>
 #include <thread>
 #include <unistd.h>
+#include <cmath>
+#include <chrono>
 
 #include <nets_lib/receivenbytes.h>
+#include <nets_lib/send.h>
 #include <protocol/Message.h>
 #include <protocol/Operation.h>
 #include <protocol/BitsUtils.h>
 #include <protocol/MathResponse.h>
-#include <cmath>
 
 #include "ServerNet.h"
 #include "ServerNetError.h"
@@ -109,11 +111,8 @@ void ServerNet::start() {
                     delete request;
                     delete[] bytes;
 
-#ifdef __APPLE__
-                    ssize_t bytesSent = send(acceptedSocket, bytesToBeSent, response->size(), 0);
-#else
-                    ssize_t bytesSent = send(acceptedSocket, bytesToBeSent, response->size(), MSG_NOSIGNAL);
-#endif
+                    ssize_t bytesSent = netslib::send(acceptedSocket, bytesToBeSent, response->size());
+                    
                     delete response;
                     delete[] bytesToBeSent;
 
@@ -198,7 +197,7 @@ Message *ServerNet::handleRequest(Message *request, int socket) {
         case OperationType::SQUARE_ROOT:
             res = 0;
             mathResponseType = MathResponseType::HARD_OPERATION_SUBMITTED;
-            submitHardOperation(*operation, 0);
+            submitHardOperation(*operation, socket);
             break;
         default:
             res = 0;
@@ -233,6 +232,7 @@ void ServerNet::submitHardOperation(Operation operation, int socket) {
     //TODO: GNU Multi-Precision Library
     std::lock_guard<std::mutex> lock(hardOperationThreadPoolMutex);
     auto hardOperationThread = new std::thread([this, operation, socket]() {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
         int64_t res;
         switch (operation.type()) {
         case OperationType::FACTORIAL:
@@ -248,11 +248,8 @@ void ServerNet::submitHardOperation(Operation operation, int socket) {
         int64AsBytes(res, data);
         auto result = Message(MessageType::SERVER_INITIATED_REQUEST, 8, data);
         auto bytes = result.toBytes();
-#ifdef __APPLE__
-        ssize_t bytesSent = send(socket, bytes, result.size(), 0);
-#else
-        ssize_t bytesSent = send(socket, bytes, result.size(), MSG_NOSIGNAL);
-#endif
+
+        ssize_t bytesSent = netslib::send(socket, bytes, result.size());
 
         if (bytesSent == -1) {
             if (delegate != nullptr) {
