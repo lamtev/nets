@@ -6,6 +6,7 @@
 #define NETS_CLIENTSESSION_H
 
 #include <thread>
+#include <atomic>
 
 class ClientSession {
  private:

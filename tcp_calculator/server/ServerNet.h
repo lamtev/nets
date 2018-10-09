@@ -43,7 +43,7 @@ class ServerNet : public ServerIODelegate {
     uint64_t nextId() noexcept;
     static void closeSocket(int socket);
     Message *handleRequest(Message *request, int socket);
-    void submitHardOperation(Operation operation, int socket);
+    void submitHardOperation(const Operation &operation, int socket);
 };
 
 

@@ -11,4 +11,12 @@ class Message;
 
 Message *requestWithInstruction(const std::string &instruction);
 
+void printHelp();
+
+constexpr static const char *help = R"(
+Arguments:
+
+<ip> <port>
+)";
+
 #endif //NETS_MAIN_H

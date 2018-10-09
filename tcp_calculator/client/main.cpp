@@ -20,10 +20,19 @@
 
 
 int main(int argc, char **argv) {
+    if (argc != 3) {
+        printHelp();
+        return -1;
+    }
     sockaddr_in peer{};
     peer.sin_family = AF_INET;
-    peer.sin_port = htons(1234);
-    peer.sin_addr.s_addr = inet_addr("127.0.0.1");
+    try {
+        peer.sin_port = htons(std::stoul(argv[2]));
+    } catch (const std::exception &e) {
+        printHelp();
+        return -1;
+    }
+    peer.sin_addr.s_addr = inet_addr(argv[1]);
 
     int socket = ::socket(AF_INET, SOCK_STREAM, 0);
     if (socket < 0) {
@@ -129,7 +138,7 @@ Message *requestWithInstruction(const std::string &instruction) {
             try {
                 operand1 = std::stol(instruction.substr(0, idx));
                 operand2 = std::stol(instruction.substr(idx + 1));
-            } catch (const std::invalid_argument &e) {
+            } catch (const std::exception &e) {
                 return nullptr;
             }
             operation = new Operation(OperationType::ADDITION, operand1, operand2);
@@ -140,7 +149,7 @@ Message *requestWithInstruction(const std::string &instruction) {
             try {
                 operand1 = std::stol(instruction.substr(0, idx));
                 operand2 = std::stol(instruction.substr(idx + 1));
-            } catch (const std::invalid_argument &e) {
+            } catch (const std::exception &e) {
                 return nullptr;
             }
             operation = new Operation(OperationType::SUBTRACTION, operand1, operand2);
@@ -151,7 +160,7 @@ Message *requestWithInstruction(const std::string &instruction) {
             try {
                 operand1 = std::stol(instruction.substr(0, idx));
                 operand2 = std::stol(instruction.substr(idx + 1));
-            } catch (const std::invalid_argument &e) {
+            } catch (const std::exception &e) {
                 return nullptr;
             }
             operation = new Operation(OperationType::MULTIPLICATION, operand1, operand2);
@@ -162,7 +171,7 @@ Message *requestWithInstruction(const std::string &instruction) {
             try {
                 operand1 = std::stol(instruction.substr(0, idx));
                 operand2 = std::stol(instruction.substr(idx + 1));
-            } catch (const std::invalid_argument &e) {
+            } catch (const std::exception &e) {
                 return nullptr;
             }
             operation = new Operation(OperationType::DIVISION, operand1, operand2);
@@ -171,7 +180,7 @@ Message *requestWithInstruction(const std::string &instruction) {
             int64_t operand1;
             try {
                 operand1 = std::stol(instruction.substr(idx + 1));
-            } catch (const std::invalid_argument &e) {
+            } catch (const std::exception &e) {
                 return nullptr;
             }
             operation = new Operation(OperationType::SQUARE_ROOT, operand1);
@@ -180,7 +189,7 @@ Message *requestWithInstruction(const std::string &instruction) {
             int64_t operand1;
             try {
                 operand1 = std::stol(instruction.substr(0, idx));
-            } catch (const std::invalid_argument &e) {
+            } catch (const std::exception &e) {
                 return nullptr;
             }
             operation = new Operation(OperationType::FACTORIAL, operand1);
@@ -195,4 +204,8 @@ Message *requestWithInstruction(const std::string &instruction) {
     }
 
     return new Message(MessageType::MATH_REQUEST, operation->nBytes(), operation->toBytes());
+}
+
+void printHelp() {
+    std::cout << help << std::endl;
 }
