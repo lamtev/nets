@@ -1,0 +1,9 @@
+project(CALCULATOR_PROTOCOL_TEST)
+
+set(CMAKE_CXX_STANDARD 14)
+
+add_executable(calculator_protocol_test main.cpp)
+target_include_directories(calculator_protocol_test PUBLIC ${Nets_SOURCE_DIR})
+
+target_link_libraries(calculator_protocol_test tcp_calculator_protocol)
+target_include_directories(calculator_protocol_test PUBLIC ${TCP_CALCULATOR_PROTOCOL_SOURCE_DIR})
