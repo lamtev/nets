@@ -83,7 +83,7 @@ void ServerNet::start() {
             }
 
             u_int64_t clientId = nextId();
-            std::thread *clientThread = new std::thread([clientThread, acceptedSocket, this, clientId]() mutable {
+            std::thread *clientThread = new std::thread([clientThread, acceptedSocket, this, clientId]() {
                 while (true) {
                     uint8_t bytesInData;
                     ssize_t bytesReceived = recv(acceptedSocket, &bytesInData, 1, 0);
