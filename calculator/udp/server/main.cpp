@@ -3,6 +3,9 @@
 //
 
 #include <iostream>
+#include <unordered_map>
+#include <chrono>
+
 #include <netinet/in.h>
 
 #include <calculator/protocol/Message.h>
@@ -11,95 +14,12 @@
 #include <calculator/protocol/MathResponse.h>
 #include <calculator/protocol/BitsUtils.h>
 #include <nets_lib/send.h>
+#include <nets_lib/SockAddr.h>
 
-Message *handleRequest(Message *request, int socket) {
-    MessageType responseType;
-    uint8_t dataSize;
-    uint8_t *data;
-    switch (request->type()) {
-        case MessageType::ACK:
-            return nullptr;
-        case MessageType::MATH_REQUEST: {
-            auto operation = Operation::of(request->data());
-            std::cout << operation->toString() << std::endl;
-            responseType = MessageType::MATH_RESPONSE;
-            int64_t result;
-            MathResponseType mathResponseType;
-            switch (operation->type()) {
-                case OperationType::ADDITION:
-                    result = operation->operand1() + operation->operand2();
-                    mathResponseType = MathResponseType::FAST_OPERATION_RESULT;
-                    break;
-                case OperationType::SUBTRACTION:
-                    result = operation->operand1() - operation->operand2();
-                    mathResponseType = MathResponseType::FAST_OPERATION_RESULT;
-                    break;
-                case OperationType::MULTIPLICATION:
-                    result = operation->operand1() * operation->operand2();
-                    mathResponseType = MathResponseType::FAST_OPERATION_RESULT;
-                    break;
-                case OperationType::DIVISION: {
-                    auto operand2 = operation->operand2();
-                    if (operand2 == 0) {
-                        result = 0;
-                        mathResponseType = MathResponseType::BAD_OPERATION;
-                    } else {
-                        result = operation->operand1() / operand2;
-                        mathResponseType = MathResponseType::FAST_OPERATION_RESULT;
-                    }
-                    break;
-                }
-                case OperationType::FACTORIAL:
-                case OperationType::SQUARE_ROOT:
-                    result = 0;
-                    mathResponseType = MathResponseType::HARD_OPERATION_SUBMITTED;
-//                    submitHardOperation(*operation, socket);
-                    break;
-                default:
-                    result = 0;
-                    mathResponseType = MathResponseType::BAD_OPERATION;
-                    break;
-            }
-            delete operation;
-            std::cout << result << std::endl;
-            MathResponse mathResponse = MathResponse(mathResponseType, result);
-            dataSize = mathResponse.size();
-            data = mathResponse.toBytes();
-            break;
-        }
-        case MessageType::CONTROL_REQUEST: {
-            if (*request->data() == 0x00) { //0x00 for CONTROL_REQUEST means "kill me". It would be better if i will add an enum
-//                std::shared_lock<std::shared_mutex> lock(clientsMutex);
-//                auto toBeRemoved = std::find_if(clients.cbegin(),
-//                                                clients.cend(),
-//                                                [socket](const ClientSession &client) -> bool {
-//                                                    return client.socket() == socket;
-//                                                });
-//                if (toBeRemoved != clients.end()) {
-//                    closeSocket(toBeRemoved->socket());
-//                    clients.erase(toBeRemoved);
-//                } else if (delegate != nullptr) {
-//                    delegate->netDidFailWithError(this, ServerNetError::KILL_CLIENT_ERROR);
-//                }
-//                lock.unlock();
-                data = new uint8_t[1];
-                *data = 0x00;
-                dataSize = 1;
-                responseType = MessageType::CONTROL_RESPONSE;
-            } else {
-                return nullptr;
-            }
-            break;
-        }
-        default:
-            return nullptr;
-    }
-
-    return new Message(responseType, dataSize, data);
-}
+#include "ClientHandler.h"
 
 std::atomic<uint64_t> cnt = 0;
-std::atomic<bool> ackReceived = false;
+std::unordered_map<SockAddr, ClientHandler *> clientHandlers;
 
 int main(int argc, char **argv) {
     sockaddr_in local{};
@@ -131,45 +51,40 @@ int main(int argc, char **argv) {
             std::cout << "0 bytes received" << std::endl;
         }
 
-        auto numberedRequest = NumberedMessage::of(buf);
-        auto request = numberedRequest->message();
-        auto response = handleRequest(request, socket);
-        delete request;
+        auto addr = SockAddr(*((const sockaddr *) &peer), peerlen);
+        auto handler = (clientHandlers[addr] = new ClientHandler(addr));
+        auto data = new uint8_t[received];
+        auto size = (size_t) received;
+        std::memcpy(data, buf, size);
 
-        if (!response) {
-            std::cout << "Ack " << numberedRequest->number() << " received" << std::endl;
-            continue;
-        }
+        handler->submit(data, size, /*ackCallback:*/[socket, peer, peerlen](uint64_t ackNumber) {
+            auto ack = new NumberedMessage(ackNumber, new Message(MessageType::ACK, 0, nullptr));
+            auto ackBytes = ack->toBytes();
+            if (sendto(socket, ackBytes, ack->size(), 0, (sockaddr *) &peer, peerlen) < 0) {
+                std::cerr << "Unable to sendto: " << strerror(errno) << std::endl;
+                return;
+            }
+            delete ack;
+            delete[] ackBytes;
 
-        std::cout << "Request received" << std::endl;
+            std::cout << "Ack " << ackNumber << " sent" << std::endl;
+        }, /*responseCallback:*/[socket, peer, peerlen, handler](const uint8_t *data, size_t size, uint64_t msgNumber) {
+            while (!handler->ackReceived) {
+                if (sendto(socket, data, size, 0, (sockaddr *) &peer, peerlen) < 0) {
+                    std::cerr << "Unable to sendto: " << strerror(errno) << std::endl;
+                    return;
+                }
 
-        auto ack = new NumberedMessage(numberedRequest->number(), new Message(MessageType::ACK, 0, nullptr));
-        auto ackBytes = ack->toBytes();
-        if (sendto(socket, ackBytes, ack->size(), 0, (sockaddr *) &peer, peerlen) < 0) {
-            std::cerr << "Unable to sendto: " << strerror(errno) << std::endl;
-            return 1;
-        }
-        delete ack;
-        delete[] ackBytes;
+                std::cout << "Response sent" << std::endl;
+                std::cout << "Waiting for ack " << msgNumber << " ..." << std::endl;
 
-        std::cout << "Ack " << numberedRequest->number() << " sent" << std::endl;
+                auto st = std::chrono::high_resolution_clock::now();
+                while (!handler->ackReceived && std::chrono::duration_cast<std::chrono::seconds>(
+                        std::chrono::high_resolution_clock::now() - st).count() < 1);
+            }
+            handler->ackReceived = false;
+        });
 
-
-        auto numberedResponse = new NumberedMessage(numberedRequest->number(), response);
-        auto numberedResponseBytes = numberedResponse->toBytes();
-
-        delete numberedRequest;
-
-        if (sendto(socket, numberedResponseBytes, numberedResponse->size(), 0, (sockaddr *) &peer, peerlen) < 0) {
-            std::cerr << "Unable to sendto: " << strerror(errno) << std::endl;
-            return 1;
-        }
-
-        std::cout << "Response sent" << std::endl;
-
-        delete[] numberedResponseBytes;
-        delete numberedResponse;
-        delete response;
     }
     return 0;
 }
