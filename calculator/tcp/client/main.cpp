@@ -11,10 +11,10 @@
 #include <netinet/in.h>
 
 #include <nets_lib/receivenbytes.h>
-#include <protocol/BitsUtils.h>
-#include <protocol/MathResponse.h>
-#include <protocol/Message.h>
-#include <protocol/Operation.h>
+#include <calculator/protocol/BitsUtils.h>
+#include <calculator/protocol/MathResponse.h>
+#include <calculator/protocol/Message.h>
+#include <calculator/protocol/Operation.h>
 
 #include "main.h"
 

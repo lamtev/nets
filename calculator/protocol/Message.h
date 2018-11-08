@@ -17,6 +17,7 @@ enum class MessageType : uint8_t {
     CONTROL_REQUEST = 0x02,
     CONTROL_RESPONSE = 0x03,
     SERVER_INITIATED_REQUEST = 0x04,
+    ACK = 0x05,
 };
 
 /**
