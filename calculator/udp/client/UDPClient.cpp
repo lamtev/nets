@@ -152,6 +152,7 @@ void UDPClient::start() {
             ssize_t receivedBytesSize = recvfrom(socket, receivedBytes, 65507, 0, nullptr, nullptr);
             if (receivedBytesSize == -1) {
                 if (errno == EAGAIN || errno == EINPROGRESS) {
+                    //Timeout is less than or equal to value set with SO_RCVTIMEO option (1 sec in or case)
                     if (waitingForAck) {
                         timeout = true;
                     }
