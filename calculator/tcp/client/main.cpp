@@ -118,7 +118,6 @@ int main(int argc, char **argv) {
 }
 
 Message *requestWithInstruction(const std::string &instruction) {
-    //TODO: check control commands first
     if (instruction == "kill me") {
         auto data = new uint8_t;
         *data = 0x00; // TODO: enum? and self coding/decoding class
