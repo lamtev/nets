@@ -37,10 +37,12 @@ public:
 
 private:
     uint16_t port;
+    int socket;
     ServerNetDelegate *delegate;
     std::unordered_map<SockAddr, ClientHandler *> clientHandlers;
     std::mutex clientHandlersMutex;
-
+    std::atomic<uint64_t> clientCounter;
+    std::vector<std::thread> joinThreads;
 };
 
 #endif //NETS_UDPSERVERNET_H

@@ -4,17 +4,27 @@
 
 #include "UDPServerNet.h"
 
+#include <arpa/inet.h>
+#include <unistd.h>
+
 #include <iostream>
+#include <chrono>
+#include <algorithm>
 
 #include <calculator/server/commons/ServerIO.h>
 #include <calculator/server/commons/ServerNetDelegate.h>
 
+#include <calculator/protocol/Message.h>
+
 
 UDPServerNet::UDPServerNet(uint16_t port) :
         port(port),
+        socket(0),
         delegate(nullptr),
         clientHandlers(),
-        clientHandlersMutex() {}
+        clientHandlersMutex(),
+        clientCounter(0),
+        joinThreads() {}
 
 void UDPServerNet::setDelegate(ServerNetDelegate *delegate) {
     this->delegate = delegate;
@@ -26,7 +36,7 @@ void UDPServerNet::start() {
     local.sin_addr.s_addr = htonl(INADDR_ANY);
     local.sin_family = AF_INET;
 
-    int socket = ::socket(AF_INET, SOCK_DGRAM, 0);
+    socket = ::socket(AF_INET, SOCK_DGRAM, 0);
     if (socket < 0) {
         std::cerr << "Socket error: " << strerror(errno) << std::endl;
     }
@@ -53,7 +63,7 @@ void UDPServerNet::start() {
         {
             std::lock_guard<std::mutex> lock(clientHandlersMutex);
             if (clientHandlers.find(addr) == clientHandlers.end()) {
-                handler = new ClientHandler(addr);
+                handler = new ClientHandler(addr, clientCounter++);
                 clientHandlers[addr] = handler;
             } else {
                 handler = clientHandlers[addr];
@@ -64,50 +74,63 @@ void UDPServerNet::start() {
         auto size = (size_t) received;
         std::memcpy(data, buf, size);
 
-        handler->submit(data, size, /*ackCallback:*/[socket, peer, peerlen](uint64_t ackNumber) {
-            auto ack = new NumberedMessage(ackNumber, new Message(MessageType::ACK, 0, nullptr));
-            auto ackBytes = ack->toBytes();
-            if (sendto(socket, ackBytes, ack->size(), 0, (sockaddr *) &peer, peerlen) < 0) {
+        handler->submit(data, size, [this, peer, peerlen, handler](uint8_t *ackBytes, size_t ackSize, uint64_t ackNumber) {
+            if (sendto(socket, ackBytes, ackSize, 0, (sockaddr *) &peer, peerlen) < 0) {
                 std::cerr << "Unable to sendto: " << strerror(errno) << std::endl;
                 return;
             }
-            delete ack;
-            delete[] ackBytes;
-
-            std::cout << "Ack " << ackNumber << " sent" << std::endl;
-        }, /*responseCallback:*/[socket, peer, peerlen, handler](const uint8_t *data, size_t size, uint64_t msgNumber) {
-            while (!handler->ackReceived) {
-                if (sendto(socket, data, size, 0, (sockaddr *) &peer, peerlen) < 0) {
+            std::cout << "[Client id=" << handler->id << "]\t" << "Ack " << ackNumber << " sent"
+                      << std::endl;
+        }, [this, peer, peerlen, handler](uint8_t *responseBytes, size_t responseSize, uint64_t responseNumber) {
+            int attemptsToReceiveAck = 0;
+            while (!handler->ackReceived && attemptsToReceiveAck++ < 10) {
+                if (sendto(socket, responseBytes, responseSize, 0, (sockaddr *) &peer, peerlen) < 0) {
                     std::cerr << "Unable to sendto: " << strerror(errno) << std::endl;
                     return;
                 }
 
-                std::cout << "Response sent" << std::endl;
-                std::cout << "Waiting for ack " << msgNumber << " ..." << std::endl;
+                std::cout << "[Client id=" << handler->id << "]\t" << "Response " << responseNumber << " sent"
+                          << std::endl;
+                std::cout << "[Client id=" << handler->id << "]\t" << "Waiting for ack " << responseNumber
+                          << " ..." << std::endl;
 
-                auto st = std::chrono::high_resolution_clock::now();
-                while (!handler->ackReceived && std::chrono::duration_cast<std::chrono::seconds>(
-                        std::chrono::high_resolution_clock::now() - st).count() < 1);
+                using namespace std::chrono;
+                auto timestamp = high_resolution_clock::now();
+                while (!handler->ackReceived && duration_cast<seconds>(high_resolution_clock::now() - timestamp).count() < 1);
             }
             handler->ackReceived = false;
         });
-
     }
+
+    stop();
 }
 
 void UDPServerNet::stop() {
+    shutdown(socket, SHUT_RDWR);
+    close(socket);
 
+    std::lock_guard<std::mutex> lock(clientHandlersMutex);
+    for (auto client :clientHandlers) {
+        delete client.second;//joins all client threads
+    }
+    clientHandlers.clear();
 }
 
-void UDPServerNet::ioWantsToKillClientWithId(ServerIO *io, uint64_t id) {
-
-}
+void UDPServerNet::ioWantsToKillClientWithId(ServerIO *io, uint64_t id) {}
 
 std::vector<Client> UDPServerNet::ioWantsToListClients(ServerIO *io) {
-    std::vector<Client> c;
-    return c;
+    std::vector<Client> clients;
+    std::lock_guard<std::mutex> lock(clientHandlersMutex);
+    for (auto client : clientHandlers) {
+        sockaddr_in addr = *((sockaddr_in *) &client.first.addr);
+        char ip[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &(addr.sin_addr), ip, INET_ADDRSTRLEN);
+        clients.emplace_back(client.second->id, ip, addr.sin_port);
+    }
+
+    return clients;
 }
 
 void UDPServerNet::ioWantsToExit(ServerIO *io) {
-
+    stop();
 }
