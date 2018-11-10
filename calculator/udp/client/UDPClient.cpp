@@ -108,7 +108,6 @@ Message *requestWithInstruction(const std::string &instruction) {
     if (operation == nullptr) {
         return nullptr;
     }
-    std::cout << operation->toString() << std::endl;
     return new Message(MessageType::MATH_REQUEST, operation->nBytes(), operation->toBytes());
 }
 
@@ -204,12 +203,23 @@ void UDPClient::start() {
                     responseReceived = true;
                     break;
                 }
-                case MessageType::SERVER_INITIATED_REQUEST:
+                case MessageType::SERVER_INITIATED_REQUEST: {
                     if (waitingForAck) {
                         break;
                     }
+                    std::cout << "Hard operation result received" << std::endl;
                     std::cout << bytesAsInt64(response->message()->data()) << std::endl;
+                    auto ack = new NumberedMessage(response->number(), new Message(MessageType::ACK, 0, nullptr));
+                    auto ackBytes = ack->toBytes();
+                    if (sendto(socket, (const void *) ackBytes, ack->size(), 0, (sockaddr *) &peer, peerLen) < 0) {
+                        std::cerr << "Unable to send: " << strerror(errno) << std::endl;
+                        break;
+                    }
+                    std::cout << "Ack " << response->number() << " sent" << std::endl;
+                    delete[] ackBytes;
+                    delete ack;
                     break;
+                }
                 default:
                     break;
             }

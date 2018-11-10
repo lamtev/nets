@@ -9,6 +9,10 @@ SockAddr::SockAddr(const sockaddr &addr, socklen_t len) noexcept :
         addr(addr),
         len(len) {}
 
+SockAddr::SockAddr(const sockaddr_in &addr, socklen_t len) noexcept :
+        addr(*(sockaddr *) &addr),
+        len(len) {}
+
 SockAddr &SockAddr::operator=(const SockAddr &source) noexcept {
     std::memcpy(&addr, &source.addr, source.len);
     len = source.len;

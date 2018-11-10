@@ -12,10 +12,13 @@
 #include <utility>
 
 struct SockAddr {
+
     sockaddr addr;
     socklen_t len;
 
     SockAddr(const sockaddr &addr, socklen_t len) noexcept;
+
+    SockAddr(const sockaddr_in &addr, socklen_t len) noexcept;
 
     SockAddr &operator=(const SockAddr &source) noexcept;
 

@@ -16,12 +16,12 @@
 #include <calculator/protocol/Operation.h>
 #include <calculator/protocol/BitsUtils.h>
 #include <calculator/protocol/MathResponse.h>
+#include <calculator/protocol/MathUtils.h>
 
 #include "ServerNet.h"
 #include "ServerNetError.h"
 #include "ClientSession.h"
 #include "ServerNetDelegate.h"
-#include "MathUtils.h"
 
 ServerNet::ServerNet(uint16_t port)
         : port(port),
