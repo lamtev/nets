@@ -5,7 +5,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <chrono>
-
+#include <mutex>
 #include <netinet/in.h>
 
 #include <calculator/protocol/Message.h>
@@ -18,8 +18,8 @@
 
 #include "ClientHandler.h"
 
-std::atomic<uint64_t> cnt = 0;
 std::unordered_map<SockAddr, ClientHandler *> clientHandlers;
+std::mutex clientHandlersMutex{};
 
 int main(int argc, char **argv) {
     sockaddr_in local{};
@@ -46,13 +46,23 @@ int main(int argc, char **argv) {
         ssize_t received = recvfrom(socket, buf, sizeof(buf), 0, (sockaddr *) &peer, &peerlen);
         if (received < 0) {
             std::cerr << "Unable to recvfrom: " << strerror(errno) << std::endl;
-            return 1;
+            break;
         } else if (received == 0) {
             std::cout << "0 bytes received" << std::endl;
         }
 
-        auto addr = SockAddr(*((const sockaddr *) &peer), peerlen);
-        auto handler = (clientHandlers[addr] = new ClientHandler(addr));
+        auto addr = SockAddr(peer, peerlen);
+        ClientHandler *handler = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(clientHandlersMutex);
+            if (clientHandlers.find(addr) == clientHandlers.end()) {
+                handler = new ClientHandler(addr);
+                clientHandlers[addr] = handler;
+            } else {
+                handler = clientHandlers[addr];
+            }
+        }
+
         auto data = new uint8_t[received];
         auto size = (size_t) received;
         std::memcpy(data, buf, size);
@@ -86,5 +96,6 @@ int main(int argc, char **argv) {
         });
 
     }
+
     return 0;
 }

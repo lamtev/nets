@@ -6,24 +6,31 @@
 
 #include <iostream>
 #include <thread>
+#include <algorithm>
+#include <cmath>
 
 #include <calculator/protocol/Message.h>
 #include <calculator/protocol/Operation.h>
 #include <calculator/protocol/MathResponse.h>
 #include <calculator/protocol/NumberedMessage.h>
+#include <calculator/protocol/MathUtils.h>
+#include <calculator/protocol/BitsUtils.h>
 
-Message *ClientHandler::handleRequest(Message *request, int socket) {
+
+Message *ClientHandler::handleRequest(NumberedMessage *request, Operation **hardOperation) {
     MessageType responseType;
     uint8_t dataSize;
     uint8_t *data;
-    switch (request->type()) {
+    auto message = request->message();
+    switch (message->type()) {
         case MessageType::ACK:
-            std::cout << "Ack " << " received" << std::endl;
-            ackReceived = true;
+            if (request->number() == responseNumber -1) {
+                std::cout << "Ack " << request->number() << " received" << std::endl;
+                ackReceived = true;
+            }
             return nullptr;
         case MessageType::MATH_REQUEST: {
-            auto operation = Operation::of(request->data());
-            std::cout << operation->toString() << std::endl;
+            auto operation = Operation::of(message->data());
             responseType = MessageType::MATH_RESPONSE;
             int64_t result;
             MathResponseType mathResponseType;
@@ -55,7 +62,7 @@ Message *ClientHandler::handleRequest(Message *request, int socket) {
                 case OperationType::SQUARE_ROOT:
                     result = 0;
                     mathResponseType = MathResponseType::HARD_OPERATION_SUBMITTED;
-//                    submitHardOperation(*operation, socket);
+                    *hardOperation = new Operation(operation->type(), operation->operand1());
                     break;
                 default:
                     result = 0;
@@ -69,40 +76,28 @@ Message *ClientHandler::handleRequest(Message *request, int socket) {
             data = mathResponse.toBytes();
             break;
         }
-        case MessageType::CONTROL_REQUEST: {
-            if (*request->data() ==
-                0x00) { //0x00 for CONTROL_REQUEST means "kill me". It would be better if i will add an enum
-//                std::shared_lock<std::shared_mutex> lock(clientsMutex);
-//                auto toBeRemoved = std::find_if(clients.cbegin(),
-//                                                clients.cend(),
-//                                                [socket](const ClientSession &client) -> bool {
-//                                                    return client.socket() == socket;
-//                                                });
-//                if (toBeRemoved != clients.end()) {
-//                    closeSocket(toBeRemoved->socket());
-//                    clients.erase(toBeRemoved);
-//                } else if (delegate != nullptr) {
-//                    delegate->netDidFailWithError(this, ServerNetError::KILL_CLIENT_ERROR);
-//                }
-//                lock.unlock();
-                data = new uint8_t[1];
-                *data = 0x00;
-                dataSize = 1;
-                responseType = MessageType::CONTROL_RESPONSE;
-            } else {
-                return nullptr;
-            }
-            break;
-        }
         default:
             return nullptr;
     }
+    delete message;
 
     return new Message(responseType, dataSize, data);
 }
 
-ClientHandler::ClientHandler(const SockAddr &addr) : ackReceived(false) {
+ClientHandler::ClientHandler(const SockAddr &addr) :
+        sockAddr(addr),
+        ackReceived(false),
+        expectedRequestNumber(0),
+        responseNumber(0),
+        threads(),
+        threadsMutex() {}
 
+ClientHandler::~ClientHandler() {
+    std::lock_guard<std::mutex> lock(threadsMutex);
+    std::for_each(threads.cbegin(), threads.cend(), [](std::thread *thread) {
+        thread->join();
+        delete thread;
+    });
 }
 
 void ClientHandler::submit(
@@ -110,20 +105,27 @@ void ClientHandler::submit(
         size_t size,
         const std::function<void(uint64_t ackNumber)> &ackCallback,
         const std::function<void(uint8_t *data, size_t size, uint64_t msgNumber)> &responseCallback) {
-    //TODO: join thread
     auto submitThread = new std::thread([data, ackCallback, responseCallback, this]() {
         auto numberedRequest = NumberedMessage::of(data);
-        auto request = numberedRequest->message();
-        auto response = handleRequest(request, 0);
+        delete[] data;
+        Operation *hardOperation = nullptr;
+        auto response = handleRequest(numberedRequest, &hardOperation);
+
         if (response == nullptr) {
             //TODO: delete objects
             return;
         }
-        delete request;
 
-        ackCallback(numberedRequest->number());
+        if (numberedRequest->number() > expectedRequestNumber) {
+            return;
+        } else if (numberedRequest->number() < expectedRequestNumber) {
+            ackCallback(numberedRequest->number());
+            return;
+        } else {
+            ackCallback(expectedRequestNumber++);
+        }
 
-        auto numberedResponse = new NumberedMessage(numberedRequest->number(), response);
+        auto numberedResponse = new NumberedMessage(responseNumber++, response);
         delete numberedRequest;
 
         auto bytes = numberedResponse->toBytes();
@@ -131,6 +133,36 @@ void ClientHandler::submit(
         responseCallback(bytes, numberedResponse->size(), numberedResponse->number());
         delete numberedResponse;
         delete[] bytes;
+
+        delete response;
+
+        if (hardOperation) {
+            std::this_thread::sleep_for(std::chrono::seconds(20));
+            int64_t res;
+            switch (hardOperation->type()) {
+                case OperationType::FACTORIAL:
+                    res = factorial(static_cast<uint64_t>(hardOperation->operand1()));
+                    break;
+                case OperationType::SQUARE_ROOT:
+                    res = static_cast<int64_t>(sqrt(hardOperation->operand1()));
+                    break;
+                default:
+                    //never happens
+                    return;
+            }
+            auto *data = new uint8_t[8];
+            int64AsBytes(res, data);
+            Message message(MessageType::SERVER_INITIATED_REQUEST, 8, data);
+            auto numberedMessage = new NumberedMessage(responseNumber, &message);
+            auto bytes = numberedMessage->toBytes();
+            delete[] data;
+            responseCallback(bytes, numberedMessage->size(), responseNumber++);
+            delete[] bytes;
+            delete numberedMessage;
+        }
+
     });
+
+    std::lock_guard<std::mutex> lock(threadsMutex);
     threads.push_back(submitThread);
 }
