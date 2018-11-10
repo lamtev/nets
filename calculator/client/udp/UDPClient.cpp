@@ -124,7 +124,6 @@ UDPClient::UDPClient(const char *addr, int port) :
         socket(0),
         waitingForAck(false),
         ackReceived(false),
-        timeout(false),
         responseReceived(false),
         messageCounter(0) {}
 
@@ -140,9 +139,6 @@ void UDPClient::start() {
         return;
     }
 
-    timeval recvTimeout{1, 0};
-    setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, &recvTimeout, sizeof(recvTimeout));
-
     unsigned int peerLen = sizeof(peer);
 
     std::thread receiveThread([this, peer, peerLen]() {
@@ -150,15 +146,8 @@ void UDPClient::start() {
             auto receivedBytes = new uint8_t[65507];
             ssize_t receivedBytesSize = recvfrom(socket, receivedBytes, 65507, 0, nullptr, nullptr);
             if (receivedBytesSize == -1) {
-                if (errno == EAGAIN || errno == EINPROGRESS) {
-                    //Timeout is less than or equal to value set with SO_RCVTIMEO option (1 sec in or case)
-                    if (waitingForAck) {
-                        timeout = true;
-                    }
-                    continue;
-                } else {
-                    break;
-                }
+                std::cout << "Unable to recvfrom" << std::endl;
+                break;
             }
 
             auto response = NumberedMessage::of(receivedBytes);
@@ -256,8 +245,9 @@ void UDPClient::start() {
             std::cout << "Request sent" << std::endl;
             std::cout << "Waiting for ack " << numberedRequest->number() << " ..." << std::endl;
             waitingForAck = true;
-            while (!ackReceived && !timeout);
-            timeout = false;
+            using namespace std::chrono;
+            auto timestamp = high_resolution_clock::now();
+            while (!ackReceived && duration_cast<seconds>(high_resolution_clock::now() - timestamp).count() < 1);
         }
         delete[] numberedRequestBytes;
         delete numberedRequest;

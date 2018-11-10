@@ -11,26 +11,30 @@
 #include <vector>
 #include <thread>
 #include <atomic>
-#include <calculator/protocol/Operation.h>
-#include <calculator/protocol/NumberedMessage.h>
 
 class Message;
+class NumberedMessage;
+class Operation;
 
+
+using Callback = std::function<void(uint8_t *data, size_t size, uint64_t number)>;
 
 class ClientHandler {
 public:
-    explicit ClientHandler(const SockAddr &addr);
+    explicit ClientHandler(const SockAddr &addr, uint64_t id);
 
     ~ClientHandler();
 
     void submit(
             uint8_t *data,
             size_t size,
-            const std::function<void(uint64_t ackNumber)> &ackCallback,
-            const std::function<void(uint8_t *data, size_t size, uint64_t msgNumber)> &responseCallback
+            const Callback &ackCallback,
+            const Callback &responseCallback
     );
 
     std::atomic<bool> ackReceived;
+
+    const uint64_t id;
 
 private:
     SockAddr sockAddr;
@@ -41,6 +45,13 @@ private:
 
 private:
     Message *handleRequest(NumberedMessage *request, Operation **hardOperation);
+
+    void handleHardOperation(
+            Operation *hardOperation,
+            const Callback &responseCallback
+    );
+
+    void ackWithNumber(uint64_t number, uint8_t **ackData, size_t *ackSize);
 
 };
 

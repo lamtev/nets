@@ -23,7 +23,6 @@ private:
 
     std::atomic<bool> waitingForAck;
     std::atomic<bool> ackReceived;
-    std::atomic<bool> timeout;
     std::atomic<bool> responseReceived;
 
     std::atomic<uint64_t> messageCounter;
