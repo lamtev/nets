@@ -5,22 +5,25 @@
 #ifndef NETS_SERVERNET_H
 #define NETS_SERVERNET_H
 
+#include "ClientSession.h"
+
 #include <cstdint>
 #include <shared_mutex>
 #include <vector>
+#include <thread>
 
-#include "ClientSession.h"
-#include "ServerIODelegate.h"
+#include <calculator/server/commons/ServerIODelegate.h>
+#include <calculator/server/commons/Client.h>
 
 class ServerNetDelegate;
 class Message;
 class Operation;
 
 
-class ServerNet : public ServerIODelegate {
- private:
+class TCPServerNet : public ServerIODelegate {
+private:
     const uint16_t port;
-    int listeningSocket{};
+    int listeningSocket;
     ServerNetDelegate *delegate;
     std::vector<ClientSession> clients;
     std::shared_mutex clientsMutex;
@@ -29,22 +32,29 @@ class ServerNet : public ServerIODelegate {
     std::mutex hardOperationThreadPoolMutex;
     std::vector<std::thread *> hardOperationThreadPool;
 
- public:
-    explicit ServerNet(uint16_t port);
+public:
+    explicit TCPServerNet(uint16_t port);
+
     void setDelegate(ServerNetDelegate *delegate);
+
     void start();
+
     void stop();
-    
+
     void ioWantsToKillClientWithId(ServerIO *io, uint64_t id) override;
-    std::vector<ClientSession> ioWantsToListClients(ServerIO *io) override;
+
+    std::vector<Client> ioWantsToListClients(ServerIO *io) override;
+
     void ioWantsToExit(ServerIO *io) override;
 
- private:
+private:
     uint64_t nextId() noexcept;
+
     static void closeSocket(int socket);
+
     Message *handleRequest(Message *request, int socket);
+
     void submitHardOperation(const Operation &operation, int socket);
 };
-
 
 #endif //NETS_SERVERNET_H

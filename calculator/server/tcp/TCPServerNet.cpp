@@ -2,40 +2,45 @@
 // Created by anton.lamtev on 30.09.2018.
 //
 
+#include "TCPServerNet.h"
+
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+
 #include <iostream>
-#include <thread>
 #include <unistd.h>
 #include <cmath>
-#include <chrono>
 
 #include <nets_lib/receivenbytes.h>
 #include <nets_lib/send.h>
+
 #include <calculator/protocol/Message.h>
 #include <calculator/protocol/Operation.h>
-#include <calculator/protocol/BitsUtils.h>
 #include <calculator/protocol/MathResponse.h>
 #include <calculator/protocol/MathUtils.h>
+#include <calculator/protocol/BitsUtils.h>
 
-#include "ServerNet.h"
-#include "ServerNetError.h"
-#include "ClientSession.h"
-#include "ServerNetDelegate.h"
+#include <calculator/server/commons/ServerNetError.h>
+#include <calculator/server/commons/ServerNetDelegate.h>
 
-ServerNet::ServerNet(uint16_t port)
-        : port(port),
-          clients(),
-          clientsMutex(),
-          idCounter(0),
-          hardOperationThreadPoolMutex(),
-          hardOperationThreadPool() {}
 
-void ServerNet::setDelegate(ServerNetDelegate *delegate) {
+TCPServerNet::TCPServerNet(uint16_t port) :
+        port(port),
+        listeningSocket(),
+        delegate(nullptr),
+        clients(),
+        clientsMutex(),
+        idCounter(0),
+        hardOperationThreadPoolMutex(),
+        hardOperationThreadPool() {}
+
+void TCPServerNet::setDelegate(ServerNetDelegate *delegate) {
     this->delegate = delegate;
 }
 
-void ServerNet::start() {
+void TCPServerNet::start() {
     listeningSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (listeningSocket < 0) {
         if (delegate != nullptr) {
@@ -180,116 +185,117 @@ void ServerNet::start() {
     acceptThread.join();
 }
 
-void ServerNet::stop() {
+void TCPServerNet::stop() {
     closeSocket(listeningSocket);
 }
 
-uint64_t ServerNet::nextId() noexcept {
+uint64_t TCPServerNet::nextId() noexcept {
     return idCounter++;
 }
 
-void ServerNet::closeSocket(int socket) {
+void TCPServerNet::closeSocket(int socket) {
     shutdown(socket, SHUT_RDWR);
     close(socket);
 }
 
-Message *ServerNet::handleRequest(Message *request, int socket) {
+Message *TCPServerNet::handleRequest(Message *request, int socket) {
     MessageType responseType;
     uint8_t dataSize;
     uint8_t *data;
     switch (request->type()) {
-    case MessageType::MATH_REQUEST: {
-        auto operation = Operation::of(request->data());
-        responseType = MessageType::MATH_RESPONSE;
-        int64_t result;
-        MathResponseType mathResponseType;
-        switch (operation->type()) {
-        case OperationType::ADDITION:
-            result = operation->operand1() + operation->operand2();
-            mathResponseType = MathResponseType::FAST_OPERATION_RESULT;
+        case MessageType::MATH_REQUEST: {
+            auto operation = Operation::of(request->data());
+            responseType = MessageType::MATH_RESPONSE;
+            int64_t result;
+            MathResponseType mathResponseType;
+            switch (operation->type()) {
+                case OperationType::ADDITION:
+                    result = operation->operand1() + operation->operand2();
+                    mathResponseType = MathResponseType::FAST_OPERATION_RESULT;
+                    break;
+                case OperationType::SUBTRACTION:
+                    result = operation->operand1() - operation->operand2();
+                    mathResponseType = MathResponseType::FAST_OPERATION_RESULT;
+                    break;
+                case OperationType::MULTIPLICATION:
+                    result = operation->operand1() * operation->operand2();
+                    mathResponseType = MathResponseType::FAST_OPERATION_RESULT;
+                    break;
+                case OperationType::DIVISION: {
+                    auto operand2 = operation->operand2();
+                    if (operand2 == 0) {
+                        result = 0;
+                        mathResponseType = MathResponseType::BAD_OPERATION;
+                    } else {
+                        result = operation->operand1() / operand2;
+                        mathResponseType = MathResponseType::FAST_OPERATION_RESULT;
+                    }
+                    break;
+                }
+                case OperationType::FACTORIAL:
+                case OperationType::SQUARE_ROOT:
+                    result = 0;
+                    mathResponseType = MathResponseType::HARD_OPERATION_SUBMITTED;
+                    submitHardOperation(*operation, socket);
+                    break;
+                default:
+                    result = 0;
+                    mathResponseType = MathResponseType::BAD_OPERATION;
+                    break;
+            }
+            delete operation;
+            MathResponse mathResponse = MathResponse(mathResponseType, result);
+            dataSize = mathResponse.size();
+            data = mathResponse.toBytes();
             break;
-        case OperationType::SUBTRACTION:
-            result = operation->operand1() - operation->operand2();
-            mathResponseType = MathResponseType::FAST_OPERATION_RESULT;
-            break;
-        case OperationType::MULTIPLICATION:
-            result = operation->operand1() * operation->operand2();
-            mathResponseType = MathResponseType::FAST_OPERATION_RESULT;
-            break;
-        case OperationType::DIVISION: {
-            auto operand2 = operation->operand2();
-            if (operand2 == 0) {
-                result = 0;
-                mathResponseType = MathResponseType::BAD_OPERATION;
+        }
+        case MessageType::CONTROL_REQUEST: {
+            if (*request->data() ==
+                0x00) { //0x00 for CONTROL_REQUEST means "kill me". It would be better if i will add an enum
+                std::shared_lock<std::shared_mutex> lock(clientsMutex);
+                auto toBeRemoved = std::find_if(clients.cbegin(),
+                                                clients.cend(),
+                                                [socket](const ClientSession &client) -> bool {
+                                                    return client.socket() == socket;
+                                                });
+                if (toBeRemoved != clients.end()) {
+                    closeSocket(toBeRemoved->socket());
+                    clients.erase(toBeRemoved);
+                } else if (delegate != nullptr) {
+                    delegate->netDidFailWithError(this, ServerNetError::KILL_CLIENT_ERROR);
+                }
+                lock.unlock();
+                data = new uint8_t[1];
+                *data = 0x00;
+                dataSize = 1;
+                responseType = MessageType::CONTROL_RESPONSE;
             } else {
-                result = operation->operand1() / operand2;
-                mathResponseType = MathResponseType::FAST_OPERATION_RESULT;
+                return nullptr;
             }
             break;
         }
-        case OperationType::FACTORIAL:
-        case OperationType::SQUARE_ROOT:
-            result = 0;
-            mathResponseType = MathResponseType::HARD_OPERATION_SUBMITTED;
-            submitHardOperation(*operation, socket);
-            break;
         default:
-            result = 0;
-            mathResponseType = MathResponseType::BAD_OPERATION;
-            break;
-        }
-        delete operation;
-        MathResponse mathResponse = MathResponse(mathResponseType, result);
-        dataSize = mathResponse.size();
-        data = mathResponse.toBytes();
-        break;
-    }
-    case MessageType::CONTROL_REQUEST: {
-        if (*request->data() == 0x00) { //0x00 for CONTROL_REQUEST means "kill me". It would be better if i will add an enum
-            std::shared_lock<std::shared_mutex> lock(clientsMutex);
-            auto toBeRemoved = std::find_if(clients.cbegin(),
-                                            clients.cend(),
-                                            [socket](const ClientSession &client) -> bool {
-                                                return client.socket() == socket;
-                                            });
-            if (toBeRemoved != clients.end()) {
-                closeSocket(toBeRemoved->socket());
-                clients.erase(toBeRemoved);
-            } else if (delegate != nullptr) {
-                delegate->netDidFailWithError(this, ServerNetError::KILL_CLIENT_ERROR);
-            }
-            lock.unlock();
-            data = new uint8_t[1];
-            *data = 0x00;
-            dataSize = 1;
-            responseType = MessageType::CONTROL_RESPONSE;
-        } else {
             return nullptr;
-        }
-        break;
-    }
-    default:
-        return nullptr;
     }
 
     return new Message(responseType, dataSize, data);
 }
 
-void ServerNet::submitHardOperation(const Operation &operation, int socket) {
+void TCPServerNet::submitHardOperation(const Operation &operation, int socket) {
     //TODO: GNU Multi-Precision Library
     std::lock_guard<std::mutex> lock(hardOperationThreadPoolMutex);
     auto hardOperationThread = new std::thread([this, operation, socket]() {
         std::this_thread::sleep_for(std::chrono::seconds(1)); //make operation really hard :)
         int64_t res;
         switch (operation.type()) {
-        case OperationType::FACTORIAL:
-            res = factorial(static_cast<uint64_t>(operation.operand1()));
-            break;
-        case OperationType::SQUARE_ROOT:
-            res = static_cast<int64_t>(sqrt(operation.operand1()));
-            break;
-        default:
-            return;
+            case OperationType::FACTORIAL:
+                res = factorial(static_cast<uint64_t>(operation.operand1()));
+                break;
+            case OperationType::SQUARE_ROOT:
+                res = static_cast<int64_t>(sqrt(operation.operand1()));
+                break;
+            default:
+                return;
         }
         auto *data = new uint8_t[8];
         int64AsBytes(res, data);
@@ -310,7 +316,7 @@ void ServerNet::submitHardOperation(const Operation &operation, int socket) {
     hardOperationThreadPool.push_back(hardOperationThread);
 }
 
-void ServerNet::ioWantsToKillClientWithId(ServerIO *io, uint64_t id) {
+void TCPServerNet::ioWantsToKillClientWithId(ServerIO *io, uint64_t id) {
     std::unique_lock<std::shared_mutex> lock(clientsMutex);
     auto toBeRemoved = std::find_if(clients.cbegin(), clients.cend(), [id](const ClientSession &client) -> bool {
         return client.id() == id;
@@ -323,11 +329,21 @@ void ServerNet::ioWantsToKillClientWithId(ServerIO *io, uint64_t id) {
     }
 }
 
-std::vector<ClientSession> ServerNet::ioWantsToListClients(ServerIO *io) {
+std::vector<Client> TCPServerNet::ioWantsToListClients(ServerIO *io) {
     std::shared_lock<std::shared_mutex> lock(clientsMutex);
-    return clients;
+    std::vector<Client> ioClients;
+    for (auto client : clients) {
+        sockaddr_in addr{};
+        socklen_t size = sizeof(sockaddr_in);
+        getpeername(client.socket(), (sockaddr *) &addr, &size);
+        char ip[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &(addr.sin_addr), ip, INET_ADDRSTRLEN);
+        ioClients.emplace_back(client.id(), ip, addr.sin_port);
+    }
+
+    return ioClients;
 }
 
-void ServerNet::ioWantsToExit(ServerIO *io) {
+void TCPServerNet::ioWantsToExit(ServerIO *io) {
     stop();
 }

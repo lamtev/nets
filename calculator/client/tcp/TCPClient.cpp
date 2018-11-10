@@ -2,6 +2,8 @@
 // Created by anton.lamtev on 04.10.2018.
 //
 
+#include "TCPClient.h"
+
 #include <iostream>
 #include <vector>
 #include <thread>
@@ -11,12 +13,11 @@
 #include <netinet/in.h>
 
 #include <nets_lib/receivenbytes.h>
+
 #include <calculator/protocol/BitsUtils.h>
 #include <calculator/protocol/MathResponse.h>
 #include <calculator/protocol/Message.h>
 #include <calculator/protocol/Operation.h>
-
-#include "main.h"
 
 
 int main(int argc, char **argv) {

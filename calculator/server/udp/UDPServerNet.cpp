@@ -1,41 +1,38 @@
 //
-// Created by anton.lamtev on 30/10/2018.
+// Created by anton.lamtev on 10/11/2018.
 //
 
+#include "UDPServerNet.h"
+
 #include <iostream>
-#include <unordered_map>
-#include <chrono>
-#include <mutex>
-#include <netinet/in.h>
 
-#include <calculator/protocol/Message.h>
-#include <calculator/protocol/NumberedMessage.h>
-#include <calculator/protocol/Operation.h>
-#include <calculator/protocol/MathResponse.h>
-#include <calculator/protocol/BitsUtils.h>
-#include <nets_lib/send.h>
-#include <nets_lib/SockAddr.h>
+#include <calculator/server/commons/ServerIO.h>
+#include <calculator/server/commons/ServerNetDelegate.h>
 
-#include "ClientHandler.h"
 
-std::unordered_map<SockAddr, ClientHandler *> clientHandlers;
-std::mutex clientHandlersMutex{};
+UDPServerNet::UDPServerNet(uint16_t port) :
+        port(port),
+        delegate(nullptr),
+        clientHandlers(),
+        clientHandlersMutex() {}
 
-int main(int argc, char **argv) {
+void UDPServerNet::setDelegate(ServerNetDelegate *delegate) {
+    this->delegate = delegate;
+}
+
+void UDPServerNet::start() {
     sockaddr_in local{};
-    local.sin_port = htons(1234);
+    local.sin_port = htons(port);
     local.sin_addr.s_addr = htonl(INADDR_ANY);
     local.sin_family = AF_INET;
 
     int socket = ::socket(AF_INET, SOCK_DGRAM, 0);
     if (socket < 0) {
         std::cerr << "Socket error: " << strerror(errno) << std::endl;
-        return 1;
     }
 
     if (bind(socket, (sockaddr *) &local, sizeof(local)) != 0) {
         std::cerr << "Unable to bind: " << strerror(errno) << std::endl;
-        return 1;
     }
 
     sockaddr_in peer{};
@@ -96,6 +93,21 @@ int main(int argc, char **argv) {
         });
 
     }
+}
 
-    return 0;
+void UDPServerNet::stop() {
+
+}
+
+void UDPServerNet::ioWantsToKillClientWithId(ServerIO *io, uint64_t id) {
+
+}
+
+std::vector<Client> UDPServerNet::ioWantsToListClients(ServerIO *io) {
+    std::vector<Client> c;
+    return c;
+}
+
+void UDPServerNet::ioWantsToExit(ServerIO *io) {
+
 }

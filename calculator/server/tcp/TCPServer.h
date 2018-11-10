@@ -7,19 +7,22 @@
 
 #include <cstdint>
 
-#include "ServerIO.h"
-#include "ServerNet.h"
+class TCPServerNet;
+class ServerIO;
 
 
-class Server {
- private:
-    ServerNet *net;
+class TCPServer {
+private:
+    TCPServerNet *net;
     ServerIO *io;
 
- public:
-    Server(uint16_t port);
-    ~Server();
+public:
+    explicit TCPServer(uint16_t port);
+
+    ~TCPServer();
+
     void start();
+
     void stop();
 };
 
