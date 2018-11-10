@@ -2,12 +2,12 @@
 // Created by anton.lamtev on 29.09.2018.
 //
 
+#include "TCPServer.h"
+
 #include <iostream>
 
-#include "Server.h"
+#include <calculator/server/commons/ServerUtils.h>
 
-
-void printHelp();
 
 int main(int argc, char **argv) {
     if (argc != 2) {
@@ -22,18 +22,8 @@ int main(int argc, char **argv) {
         return -1;
     }
 
-    auto server = Server(port);
+    auto server = TCPServer(port);
     server.start();
 
     return 0;
-}
-
-constexpr static const char *help = R"(
-Arguments:
-
-<port> - port
-)";
-
-void printHelp() {
-    std::cout << help << std::endl;
 }

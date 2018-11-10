@@ -5,28 +5,30 @@
 #ifndef NETS_SERVERIO_H
 #define NETS_SERVERIO_H
 
+#include "ServerNetDelegate.h"
 
 #include <vector>
 
-#include "ServerNetDelegate.h"
-
 class ServerIODelegate;
-class ClientSession;
+class Client;
 
 
 class ServerIO : public ServerNetDelegate {
- private:
+private:
     ServerIODelegate *delegate;
     bool isRunning;
-    std::vector<ClientSession> clients;
+    std::vector<Client> clients;
 
- public:
+public:
     ServerIO();
-    void start();
-    void stop();
-    void setDelegate(ServerIODelegate *delegate);
-    void netDidFailWithError(ServerNet *net, ServerNetError error) override;
-};
 
+    void start();
+
+    void stop();
+
+    void setDelegate(ServerIODelegate *delegate);
+
+    void netDidFailWithError(TCPServerNet *net, ServerNetError error) override;
+};
 
 #endif //NETS_SERVERIO_H

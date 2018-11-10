@@ -6,17 +6,19 @@
 #define NETS_CLIENTSESSION_H
 
 #include <thread>
-#include <atomic>
+
 
 class ClientSession {
- private:
+private:
     uint64_t _id;
     int _socket;
     std::thread *_thread;
 
- public:
-    ClientSession(uint64_t id, int socket, std::thread *thread) noexcept : _id(id), _socket(socket), _thread(thread) {
-    }
+public:
+    ClientSession(uint64_t id, int socket, std::thread *thread) noexcept :
+            _id(id),
+            _socket(socket),
+            _thread(thread) {}
 
     uint64_t id() const noexcept {
         return _id;

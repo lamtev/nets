@@ -7,10 +7,13 @@
 
 #include <atomic>
 
+
 class UDPClient {
 public:
     UDPClient(const char *addr, int port);
+
     void start();
+
     void stop();
 
 private:

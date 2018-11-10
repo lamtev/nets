@@ -2,20 +2,23 @@
 // Created by anton.lamtev on 30.09.2018.
 //
 
-#include "Server.h"
+#include "TCPServer.h"
+#include "TCPServerNet.h"
+
+#include <calculator/server/commons/ServerIO.h>
 
 
-Server::Server(uint16_t port) : net(new ServerNet(port)), io(new ServerIO()) {
+TCPServer::TCPServer(uint16_t port) : net(new TCPServerNet(port)), io(new ServerIO()) {
     net->setDelegate(io);
     io->setDelegate(net);
 }
 
-Server::~Server() {
+TCPServer::~TCPServer() {
     delete net;
     delete io;
 }
 
-void Server::start() {
+void TCPServer::start() {
     std::thread ioThread([this]() {
         io->start();
     });
@@ -23,7 +26,7 @@ void Server::start() {
     ioThread.join();
 }
 
-void Server::stop() {
+void TCPServer::stop() {
     io->stop();
     net->stop();
 }

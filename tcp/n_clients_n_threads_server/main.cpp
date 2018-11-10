@@ -8,7 +8,7 @@
 
 #include <nets_lib/receivenbytes.h>
 
-#include "main.h"
+#include "TCPClient.h"
 
 constexpr int DEFAULT_PORT = 7500;
 size_t messageLength;
@@ -199,8 +199,8 @@ static const char *helpMessage = R"(
 Usage:
 
 exit            close all sockets, terminate threads and exit
-list            print client list
-kill <idx>      kill idx-th client
+list            print udp list
+kill <idx>      kill idx-th udp
 )";
 
 void printHelp() {
