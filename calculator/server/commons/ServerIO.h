@@ -28,7 +28,7 @@ public:
 
     void setDelegate(ServerIODelegate *delegate);
 
-    void netDidFailWithError(TCPServerNet *net, ServerNetError error) override;
+    void netDidFailWithError(ServerNet *net, ServerNetError error) override;
 };
 
 #endif //NETS_SERVERIO_H

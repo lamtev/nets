@@ -8,12 +8,12 @@
 
 #include "ServerNetError.h"
 
-class TCPServerNet;
+class ServerNet;
 
 
 class ServerNetDelegate {
 public:
-    virtual void netDidFailWithError(TCPServerNet *net, ServerNetError error) = 0;
+    virtual void netDidFailWithError(ServerNet *net, ServerNetError error) = 0;
 };
 
 

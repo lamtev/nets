@@ -52,7 +52,9 @@ void UDPServerNet::start() {
         peerlen = sizeof(peer);
         ssize_t received = recvfrom(socket, buf, sizeof(buf), 0, (sockaddr *) &peer, &peerlen);
         if (received < 0) {
-            std::cerr << "Unable to recvfrom: " << strerror(errno) << std::endl;
+            if (delegate) {
+                delegate->netDidFailWithError(this, ServerNetError::SOCKET_SEND_TO_ERROR);
+            }
             break;
         } else if (received == 0) {
             std::cout << "0 bytes received" << std::endl;
@@ -76,7 +78,9 @@ void UDPServerNet::start() {
 
         handler->submit(data, size, [this, peer, peerlen, handler](uint8_t *ackBytes, size_t ackSize, uint64_t ackNumber) {
             if (sendto(socket, ackBytes, ackSize, 0, (sockaddr *) &peer, peerlen) < 0) {
-                std::cerr << "Unable to sendto: " << strerror(errno) << std::endl;
+                if (delegate) {
+                    delegate->netDidFailWithError(this, ServerNetError::SOCKET_RECEIVE_FROM_ERROR);
+                }
                 return;
             }
             std::cout << "[Client id=" << handler->id << "]\t" << "Ack " << ackNumber << " sent"
@@ -85,7 +89,9 @@ void UDPServerNet::start() {
             int attemptsToReceiveAck = 0;
             while (!handler->ackReceived && attemptsToReceiveAck++ < 10) {
                 if (sendto(socket, responseBytes, responseSize, 0, (sockaddr *) &peer, peerlen) < 0) {
-                    std::cerr << "Unable to sendto: " << strerror(errno) << std::endl;
+                    if (delegate) {
+                        delegate->netDidFailWithError(this, ServerNetError::SOCKET_SEND_TO_ERROR);
+                    }
                     return;
                 }
 

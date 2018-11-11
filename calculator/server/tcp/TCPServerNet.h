@@ -2,8 +2,8 @@
 // Created by anton.lamtev on 30.09.2018.
 //
 
-#ifndef NETS_SERVERNET_H
-#define NETS_SERVERNET_H
+#ifndef NETS_TCPSERVERNET_H
+#define NETS_TCPSERVERNET_H
 
 #include "ClientSession.h"
 
@@ -13,6 +13,7 @@
 #include <thread>
 
 #include <calculator/server/commons/ServerIODelegate.h>
+#include <calculator/server/commons/ServerNet.h>
 #include <calculator/server/commons/Client.h>
 
 class ServerNetDelegate;
@@ -20,7 +21,7 @@ class Message;
 class Operation;
 
 
-class TCPServerNet : public ServerIODelegate {
+class TCPServerNet : public ServerNet, public ServerIODelegate {
 private:
     const uint16_t port;
     int listeningSocket;
@@ -35,11 +36,11 @@ private:
 public:
     explicit TCPServerNet(uint16_t port);
 
-    void setDelegate(ServerNetDelegate *delegate);
+    void setDelegate(ServerNetDelegate *delegate) override;
 
-    void start();
+    void start() override;
 
-    void stop();
+    void stop() override;
 
     void ioWantsToKillClientWithId(ServerIO *io, uint64_t id) override;
 
@@ -57,4 +58,4 @@ private:
     void submitHardOperation(const Operation &operation, int socket);
 };
 
-#endif //NETS_SERVERNET_H
+#endif //NETS_TCPSERVERNET_H
