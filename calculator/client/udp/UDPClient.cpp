@@ -24,6 +24,8 @@
 #include <nets_lib/receivenbytes.h>
 
 
+static const int MAXIMUM_ATTEMPTS_TO_RECEIVE_ACK = 5;
+
 Message *requestWithInstruction(const std::string &instruction) {
     if (instruction == "kill me") {
         auto data = new uint8_t;
@@ -227,6 +229,20 @@ void UDPClient::start() {
             break;
         }
 
+        if (instruction == "sh") {
+            std::vector<uint64_t> nums = {0, 3, 2, 1};
+            sendFakeMessages(peer, peerLen, nums);
+            continue;
+        } else if (instruction == "dup") {
+            std::vector<uint64_t> nums = {0, 0, 1, 1};
+            sendFakeMessages(peer, peerLen, nums);
+            continue;
+        } else if (instruction == "los") {
+            std::vector<uint64_t> nums = {0, 2, 4, 6};
+            sendFakeMessages(peer, peerLen, nums);
+            continue;
+        }
+
         auto request = requestWithInstruction(instruction);
 
         if (request == nullptr) {
@@ -234,11 +250,13 @@ void UDPClient::start() {
             continue;
         }
 
-        auto numberedRequest = new NumberedMessage(messageCounter++, request);
+        auto *numberedRequest = new NumberedMessage(messageCounter++, request);
         uint8_t *numberedRequestBytes = numberedRequest->toBytes();
 
-        while (!ackReceived) {
-            if (sendto(socket, (const void *) numberedRequestBytes, numberedRequest->size(), 0, (sockaddr *) &peer, peerLen) < 0) {
+        int attemptsToReceiveAck = 0;
+        while (!ackReceived && attemptsToReceiveAck++ < MAXIMUM_ATTEMPTS_TO_RECEIVE_ACK) {
+            if (sendto(socket, (const void *) numberedRequestBytes, numberedRequest->size(), 0, (sockaddr *) &peer,
+                       peerLen) < 0) {
                 std::cerr << "Unable to send: " << strerror(errno) << std::endl;
                 break;
             }
@@ -255,7 +273,7 @@ void UDPClient::start() {
         ackReceived = false;
         waitingForAck = false;
 
-        while (!responseReceived);
+        while (!responseReceived && attemptsToReceiveAck < MAXIMUM_ATTEMPTS_TO_RECEIVE_ACK);
         responseReceived = false;
     }
     receiveThread.join();
@@ -264,4 +282,51 @@ void UDPClient::start() {
 void UDPClient::stop() {
     shutdown(socket, SHUT_RDWR);
     close(socket);
+}
+
+void UDPClient::sendFakeMessages(const sockaddr_in &peer, socklen_t peerLen, const std::vector<uint64_t> &nums) {
+    std::vector<Message *> v = {
+            requestWithInstruction("5+5"),
+            requestWithInstruction("5*5"),
+            requestWithInstruction("5-5"),
+            requestWithInstruction("5/5")
+    };
+
+    int i = 0;
+    for (auto request : v) {
+        auto *numberedRequest = new NumberedMessage(nums[i++], request);
+        uint8_t *numberedRequestBytes = numberedRequest->toBytes();
+
+        int attemptsToReceiveAck = 0;
+        while (!ackReceived && attemptsToReceiveAck++ < MAXIMUM_ATTEMPTS_TO_RECEIVE_ACK) {
+            if (sendto(socket, (const void *) numberedRequestBytes, numberedRequest->size(), 0, (sockaddr *) &peer,
+                       peerLen) < 0) {
+                std::cerr << "Unable to send: " << strerror(errno) << std::endl;
+                break;
+            }
+            std::cout << "Request sent" << std::endl;
+            std::cout << "Waiting for ack " << numberedRequest->number() << " ..." << std::endl;
+            waitingForAck = true;
+            using namespace std::chrono;
+            auto timestamp = high_resolution_clock::now();
+            while (!ackReceived && duration_cast<seconds>(high_resolution_clock::now() - timestamp).count() < 1);
+        }
+        delete[] numberedRequestBytes;
+        delete numberedRequest;
+
+        ackReceived = false;
+        waitingForAck = false;
+
+        using namespace std::chrono;
+        auto timestamp = high_resolution_clock::now();
+
+        while (!responseReceived &&
+               attemptsToReceiveAck < MAXIMUM_ATTEMPTS_TO_RECEIVE_ACK &&
+               duration_cast<seconds>(high_resolution_clock::now() - timestamp).count() < 1);
+        responseReceived = false;
+    }
+
+    for (auto request : v) {
+        delete request;
+    }
 }

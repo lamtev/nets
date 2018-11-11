@@ -54,10 +54,13 @@ void ClientHandler::submit(
         size_t ackSize;
 
         if (request->number() > expectedRequestNumber) {
+            std::cout << "[Client id=" << id << "]\t" << "Request " << request->number() << " dropped" << std::endl;
+            std::cout << "[Client id=" << id << "]\t" << "Ack " << request->number() << " is not sent" << std::endl;
             delete request;
             delete hardOperation;
             return;
         } else if (request->number() < expectedRequestNumber) {
+            std::cout << "[Client id=" << id << "]\t" << "Request " << request->number() << " dropped" << std::endl;
             ackWithNumber(request->number(), &ackData, &ackSize);
             ackCallback(ackData, ackSize, request->number());
             delete[] ackData;
@@ -84,7 +87,6 @@ void ClientHandler::submit(
         if (hardOperation) {
             handleHardOperation(hardOperation, responseCallback);
         }
-
     });
 
     std::lock_guard<std::mutex> lock(threadsMutex);
