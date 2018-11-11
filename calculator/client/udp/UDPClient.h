@@ -7,7 +7,7 @@
 
 #include <atomic>
 
-
+//TODO: cases for shuffled and duplicated messages
 class UDPClient {
 public:
     UDPClient(const char *addr, int port);

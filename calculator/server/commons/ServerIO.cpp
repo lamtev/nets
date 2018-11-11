@@ -5,6 +5,7 @@
 #include "ServerIO.h"
 #include "ServerIODelegate.h"
 #include "Client.h"
+#include "ServerNet.h"
 
 #include <string>
 #include <iostream>
@@ -65,7 +66,7 @@ void ServerIO::setDelegate(ServerIODelegate *delegate) {
     this->delegate = delegate;
 }
 
-void ServerIO::netDidFailWithError(TCPServerNet *net, ServerNetError error) {
+void ServerIO::netDidFailWithError(ServerNet *net, ServerNetError error) {
     switch (error) {
         case ServerNetError::SOCKET_CREATE_ERROR:
             std::cerr << "Socket error: " << strerror(errno) << std::endl;
@@ -88,6 +89,10 @@ void ServerIO::netDidFailWithError(TCPServerNet *net, ServerNetError error) {
         case ServerNetError::KILL_CLIENT_ERROR:
             std::cerr << "Unable to kill udp with specified index" << std::endl;
             break;
+        case ServerNetError::SOCKET_RECEIVE_FROM_ERROR:
+            std::cerr << "Unable to receive from: " << strerror(errno) << std::endl;
+        case ServerNetError::SOCKET_SEND_TO_ERROR:
+            std::cerr << "Unable to sendto: " << strerror(errno) << std::endl;
         default:
             return;
     }

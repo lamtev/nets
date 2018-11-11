@@ -7,6 +7,8 @@ set(CALCULATOR_SERVER_COMMONS_SRC
         ServerIODelegate.h
         ServerIO.h ServerIO.cpp
         ServerNetError.h
-        Client.h ServerUtils.cpp ServerUtils.h)
+        Client.h
+        ServerUtils.cpp ServerUtils.h
+        ServerNet.h)
 
 add_library(calculator_server_commons STATIC ${CALCULATOR_SERVER_COMMONS_SRC})

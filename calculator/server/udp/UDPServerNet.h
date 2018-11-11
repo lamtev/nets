@@ -14,20 +14,21 @@
 #include <nets_lib/SockAddr.h>
 
 #include <calculator/server/commons/ServerIODelegate.h>
+#include <calculator/server/commons/ServerNet.h>
 #include <calculator/server/commons/Client.h>
 
 class ServerNetDelegate;
 
 
-class UDPServerNet : public ServerIODelegate {
+class UDPServerNet : public ServerNet, public ServerIODelegate {
 public:
     explicit UDPServerNet(uint16_t port);
 
-    void setDelegate(ServerNetDelegate *delegate);
+    void setDelegate(ServerNetDelegate *delegate) override;
 
-    void start();
+    void start() override;
 
-    void stop();
+    void stop() override;
 
     void ioWantsToKillClientWithId(ServerIO *io, uint64_t id) override;
 
