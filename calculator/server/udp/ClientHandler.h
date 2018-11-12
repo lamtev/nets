@@ -51,7 +51,7 @@ private:
             const Callback &responseCallback
     );
 
-    void ackWithNumber(uint64_t number, uint8_t **ackData, size_t *ackSize);
+    void buildAckWithNumber(uint64_t number, uint8_t **ackData, size_t *ackSize);
 
 };
 

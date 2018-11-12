@@ -8,7 +8,7 @@
 #include "ClientHandler.h"
 
 #include <unordered_map>
-#include <mutex>
+#include <shared_mutex>
 #include <cstdint>
 
 #include <nets_lib/SockAddr.h>
@@ -41,7 +41,7 @@ private:
     int socket;
     ServerNetDelegate *delegate;
     std::unordered_map<SockAddr, ClientHandler *> clientHandlers;
-    std::mutex clientHandlersMutex;
+    std::shared_mutex clientHandlersMutex;
     std::atomic<uint64_t> clientCounter;
     std::vector<std::thread> joinThreads;
 };
