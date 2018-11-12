@@ -58,12 +58,13 @@ void UDPServerNet::start() {
             break;
         } else if (received == 0) {
             std::cout << "0 bytes received" << std::endl;
+            continue;
         }
 
         auto addr = SockAddr(peer, peerlen);
         ClientHandler *handler = nullptr;
         {
-            std::lock_guard<std::mutex> lock(clientHandlersMutex);
+            std::unique_lock<std::shared_mutex> lock(clientHandlersMutex);
             if (clientHandlers.find(addr) == clientHandlers.end()) {
                 handler = new ClientHandler(addr, clientCounter++);
                 clientHandlers[addr] = handler;
@@ -115,7 +116,7 @@ void UDPServerNet::stop() {
     shutdown(socket, SHUT_RDWR);
     close(socket);
 
-    std::lock_guard<std::mutex> lock(clientHandlersMutex);
+    std::unique_lock<std::shared_mutex> lock(clientHandlersMutex);
     for (auto client :clientHandlers) {
         delete client.second;//joins all client threads
     }
@@ -126,7 +127,7 @@ void UDPServerNet::ioWantsToKillClientWithId(ServerIO *io, uint64_t id) {}
 
 std::vector<Client> UDPServerNet::ioWantsToListClients(ServerIO *io) {
     std::vector<Client> clients;
-    std::lock_guard<std::mutex> lock(clientHandlersMutex);
+    std::shared_lock<std::shared_mutex> lock(clientHandlersMutex);
     for (auto client : clientHandlers) {
         sockaddr_in addr = *((sockaddr_in *) &client.first.addr);
         char ip[INET_ADDRSTRLEN];

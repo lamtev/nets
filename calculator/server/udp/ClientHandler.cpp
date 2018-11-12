@@ -28,10 +28,11 @@ ClientHandler::ClientHandler(const SockAddr &addr, uint64_t id) :
 
 ClientHandler::~ClientHandler() {
     std::lock_guard<std::mutex> lock(threadsMutex);
-    std::for_each(threads.cbegin(), threads.cend(), [](std::thread *thread) {
+    for (auto thread : threads) {
         thread->join();
         delete thread;
-    });
+    }
+    threads.clear();
 }
 
 void ClientHandler::submit(
@@ -41,16 +42,18 @@ void ClientHandler::submit(
         const Callback &responseCallback) {
     auto submitThread = new std::thread([data, ackCallback, responseCallback, this]() {
         auto request = NumberedMessage::of(data);
-        delete[] data;
+
         Operation *hardOperation = nullptr;
         auto response = handleRequest(request, &hardOperation);
+
+        delete[] data;
 
         if (response == nullptr) {
             delete request;
             return;
         }
 
-        uint8_t *ackData;
+        uint8_t *ackBytes;
         size_t ackSize;
 
         if (request->number() > expectedRequestNumber) {
@@ -61,17 +64,17 @@ void ClientHandler::submit(
             return;
         } else if (request->number() < expectedRequestNumber) {
             std::cout << "[Client id=" << id << "]\t" << "Request " << request->number() << " dropped" << std::endl;
-            ackWithNumber(request->number(), &ackData, &ackSize);
-            ackCallback(ackData, ackSize, request->number());
-            delete[] ackData;
+            buildAckWithNumber(request->number(), &ackBytes, &ackSize);
+            ackCallback(ackBytes, ackSize, request->number());
+            delete[] ackBytes;
             delete request;
             delete hardOperation;
             return;
-        } else {
-            ackWithNumber(expectedRequestNumber, &ackData, &ackSize);
-            ackCallback(ackData, ackSize, expectedRequestNumber++);
-            delete[] ackData;
         }
+
+        buildAckWithNumber(expectedRequestNumber, &ackBytes, &ackSize);
+        ackCallback(ackBytes, ackSize, expectedRequestNumber++);
+        delete[] ackBytes;
 
         auto numberedResponse = new NumberedMessage(responseNumber++, response);
         delete request;
@@ -110,7 +113,7 @@ Message *ClientHandler::handleRequest(NumberedMessage *request, Operation **hard
             auto operation = Operation::of(message->data());
             responseType = MessageType::MATH_RESPONSE;
             int64_t result = 0;
-            MathResponseType mathResponseType;
+            auto mathResponseType = MathResponseType::BAD_OPERATION;
             if (operation) {
                 switch (operation->type()) {
                     case OperationType::ADDITION:
@@ -192,7 +195,7 @@ void ClientHandler::handleHardOperation(
     delete numberedMessage;
 }
 
-void ClientHandler::ackWithNumber(uint64_t number, uint8_t **ackData, size_t *ackSize) {
+void ClientHandler::buildAckWithNumber(uint64_t number, uint8_t **ackData, size_t *ackSize) {
     auto ack = new NumberedMessage(number, new Message(MessageType::ACK, 0, nullptr));
     auto ackBytes = ack->toBytes();
     *ackData = ackBytes;
