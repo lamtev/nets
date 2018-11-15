@@ -1,3 +1,5 @@
+#include <utility>
+
 //
 // Created by anton.lamtev on 01.10.2018.
 //
@@ -8,29 +10,13 @@
 #include <thread>
 
 
-class ClientSession {
-private:
-    uint64_t _id;
-    int _socket;
-    std::thread *_thread;
+struct ClientSession {
+    uint64_t id;
+    int socket;
 
-public:
-    ClientSession(uint64_t id, int socket, std::thread *thread) noexcept :
-            _id(id),
-            _socket(socket),
-            _thread(thread) {}
-
-    uint64_t id() const noexcept {
-        return _id;
-    }
-
-    int socket() const noexcept {
-        return _socket;
-    }
-
-    std::thread *thread() const noexcept {
-        return _thread;
-    }
+    ClientSession(uint64_t id, int socket) noexcept :
+            id(id),
+            socket(socket) {}
 
 };
 
