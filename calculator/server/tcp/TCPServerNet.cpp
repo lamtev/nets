@@ -33,8 +33,8 @@ TCPServerNet::TCPServerNet(uint16_t port) :
         clients(),
         clientsMutex(),
         idCounter(0),
-        hardOperationThreadPoolMutex(),
-        hardOperationThreadPool() {}
+        clientThreadsMutex(),
+        clientThreads() {}
 
 void TCPServerNet::setDelegate(ServerNetDelegate *delegate) {
     this->delegate = delegate;
@@ -88,7 +88,7 @@ void TCPServerNet::start() {
             }
 
             u_int64_t clientId = nextId();
-            std::thread *clientThread = new std::thread([clientThread, acceptedSocket, this, clientId]() {
+            std::thread clientThread([acceptedSocket, this, clientId] {
                 while (true) {
                     uint8_t bytesInData;
                     ssize_t bytesReceived = recv(acceptedSocket, &bytesInData, 1, 0);
@@ -132,57 +132,46 @@ void TCPServerNet::start() {
                         }
                     }
                 }
+
                 std::unique_lock<std::shared_mutex> lock(clientsMutex);
 
                 closeSocket(acceptedSocket);
 
-                auto toBeRemoved = std::find_if(clients.cbegin(),
-                                                clients.cend(),
+                auto toBeRemoved = std::find_if(clients.cbegin(), clients.cend(),
                                                 [clientId](const ClientSession &client) -> bool {
-                                                    return clientId == client.id();
+                                                    return clientId == client.id;
                                                 });
 
                 if (toBeRemoved != clients.cend()) {
                     clients.erase(toBeRemoved);
                 }
-                if (clientThread != nullptr) {
-                    if (clientThread->joinable()) {
-                        clientThread->detach();
-                    }
-                    delete clientThread;
-                }
             });
+            {
+                std::lock_guard<std::mutex> lock(clientThreadsMutex);
+                clientThreads.push_back(std::move(clientThread));
+            }
 
-            std::unique_lock<std::shared_mutex> lock(clientsMutex);
-            if (clientThread != nullptr) {
-                clients.emplace_back(clientId, acceptedSocket, clientThread);
+            {
+                std::unique_lock<std::shared_mutex> lock(clientsMutex);
+                clients.emplace_back(clientId, acceptedSocket);
             }
-        }
-        {
-            std::unique_lock<std::shared_mutex> lock(clientsMutex);
-            for (auto &client : clients) {
-                if (client.thread() != nullptr) {
-                    closeSocket(client.socket());
-                    if (client.thread()->joinable()) {
-                        client.thread()->detach();
-                    }
-                    delete client.thread();
-                }
-            }
-            clients.clear();
+
         }
 
-        {
-            std::lock_guard<std::mutex> lock(hardOperationThreadPoolMutex);
-            for (auto thread : hardOperationThreadPool) {
-                thread->join();
-                delete thread;
-            }
+        std::unique_lock<std::shared_mutex> lock(clientsMutex);
+        for (auto &client : clients) {
+            closeSocket(client.socket);
         }
-
+        clients.clear();
     });
 
     acceptThread.join();
+
+    std::lock_guard<std::mutex> lock(clientThreadsMutex);
+    for (std::thread &thread : clientThreads) {
+        thread.join();
+    }
+    clientThreads.clear();
 }
 
 void TCPServerNet::stop() {
@@ -256,10 +245,10 @@ Message *TCPServerNet::handleRequest(Message *request, int socket) {
                 auto toBeRemoved = std::find_if(clients.cbegin(),
                                                 clients.cend(),
                                                 [socket](const ClientSession &client) -> bool {
-                                                    return client.socket() == socket;
+                                                    return client.socket == socket;
                                                 });
                 if (toBeRemoved != clients.end()) {
-                    closeSocket(toBeRemoved->socket());
+                    closeSocket(toBeRemoved->socket);
                     clients.erase(toBeRemoved);
                 } else if (delegate != nullptr) {
                     delegate->netDidFailWithError(this, ServerNetError::KILL_CLIENT_ERROR);
@@ -283,9 +272,9 @@ Message *TCPServerNet::handleRequest(Message *request, int socket) {
 
 void TCPServerNet::submitHardOperation(const Operation &operation, int socket) {
     //TODO: GNU Multi-Precision Library
-    std::lock_guard<std::mutex> lock(hardOperationThreadPoolMutex);
-    auto hardOperationThread = new std::thread([this, operation, socket]() {
-        std::this_thread::sleep_for(std::chrono::seconds(1)); //make operation really hard :)
+    std::lock_guard<std::mutex> lock(clientThreadsMutex);
+    clientThreads.emplace_back([this, operation, socket]() {
+        std::this_thread::sleep_for(std::chrono::seconds(20)); //make operation really hard :)
         int64_t res;
         switch (operation.type()) {
             case OperationType::FACTORIAL:
@@ -313,17 +302,16 @@ void TCPServerNet::submitHardOperation(const Operation &operation, int socket) {
         delete[] data;
         delete[] bytes;
     });
-    hardOperationThreadPool.push_back(hardOperationThread);
 }
 
 void TCPServerNet::ioWantsToKillClientWithId(ServerIO *io, uint64_t id) {
     std::unique_lock<std::shared_mutex> lock(clientsMutex);
     auto toBeRemoved = std::find_if(clients.cbegin(), clients.cend(), [id](const ClientSession &client) -> bool {
-        return client.id() == id;
+        return client.id == id;
     });
 
     if (toBeRemoved != clients.cend()) {
-        closeSocket(toBeRemoved->socket());
+        closeSocket(toBeRemoved->socket);
     } else if (delegate != nullptr) {
         delegate->netDidFailWithError(this, ServerNetError::KILL_CLIENT_ERROR);
     }
@@ -332,13 +320,13 @@ void TCPServerNet::ioWantsToKillClientWithId(ServerIO *io, uint64_t id) {
 std::vector<Client> TCPServerNet::ioWantsToListClients(ServerIO *io) {
     std::shared_lock<std::shared_mutex> lock(clientsMutex);
     std::vector<Client> ioClients;
-    for (auto client : clients) {
+    for (const auto &client : clients) {
         sockaddr_in addr{};
         socklen_t size = sizeof(sockaddr_in);
-        getpeername(client.socket(), (sockaddr *) &addr, &size);
+        getpeername(client.socket, (sockaddr *) &addr, &size);
         char ip[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &(addr.sin_addr), ip, INET_ADDRSTRLEN);
-        ioClients.emplace_back(client.id(), ip, addr.sin_port);
+        ioClients.emplace_back(client.id, ip, addr.sin_port);
     }
 
     return ioClients;

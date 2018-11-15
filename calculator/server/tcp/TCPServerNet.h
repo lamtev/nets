@@ -30,8 +30,8 @@ private:
     std::shared_mutex clientsMutex;
     std::atomic<uint64_t> idCounter;
 
-    std::mutex hardOperationThreadPoolMutex;
-    std::vector<std::thread *> hardOperationThreadPool;
+    std::mutex clientThreadsMutex;
+    std::vector<std::thread> clientThreads;
 
 public:
     explicit TCPServerNet(uint16_t port);
