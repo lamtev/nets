@@ -10,8 +10,8 @@
 #include <unistd.h>
 
 #include <iostream>
-#include <unistd.h>
 #include <cmath>
+#include <algorithm>
 
 #include <nets_lib/receivenbytes.h>
 #include <nets_lib/send.h>

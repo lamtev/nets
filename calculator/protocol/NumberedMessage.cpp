@@ -7,6 +7,7 @@
 #include "BitsUtils.h"
 
 #include <memory>
+#include <cstring>
 
 
 NumberedMessage::NumberedMessage(uint64_t number, Message *message)
