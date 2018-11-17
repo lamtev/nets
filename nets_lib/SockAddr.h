@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <cstring>
 
 struct SockAddr {
 

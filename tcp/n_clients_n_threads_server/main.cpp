@@ -5,10 +5,11 @@
 
 #include <iostream>
 #include <vector>
+#include <cstring>
 
 #include <nets_lib/receivenbytes.h>
 
-#include "TCPClient.h"
+#include "include.h"
 
 constexpr int DEFAULT_PORT = 7500;
 size_t messageLength;
@@ -122,7 +123,7 @@ void *acceptThreadRoutine(void *args) {
         }
         std::cout << "Accepted" << std::endl;
 
-        pthread_t clientThread = nullptr;
+        pthread_t clientThread;
         pthread_attr_t clientThreadAttr;
         pthread_attr_init(&clientThreadAttr);
 
@@ -160,7 +161,7 @@ void *clientThreadRoutine(void *args) {
 #ifdef __APPLE__
         ssize_t bytesSent = send(clientThreadArgs->socket, buf, strlen(buf), 0);
 #else
-        ssize_t bytesSent = send(clientThreadArgs->_socket, buf, strlen(buf), MSG_NOSIGNAL);
+        ssize_t bytesSent = send(clientThreadArgs->socket, buf, strlen(buf), MSG_NOSIGNAL);
 #endif
         if (bytesSent == -1) {
             std::cerr << "Unable to send: " << strerror(errno) << std::endl;

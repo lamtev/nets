@@ -11,6 +11,7 @@
 #include <shared_mutex>
 #include <vector>
 #include <thread>
+#include <atomic>
 
 #include <calculator/server/commons/ServerIODelegate.h>
 #include <calculator/server/commons/ServerNet.h>
