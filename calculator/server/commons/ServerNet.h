@@ -9,6 +9,7 @@ class ServerNetDelegate;
 
 
 class ServerNet {
+public:
     virtual void setDelegate(ServerNetDelegate *delegate) = 0;
 
     virtual void start() = 0;

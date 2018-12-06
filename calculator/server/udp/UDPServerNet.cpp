@@ -24,7 +24,9 @@ UDPServerNet::UDPServerNet(uint16_t port) :
         clientHandlers(),
         clientHandlersMutex(),
         clientCounter(0),
-        joinThreads() {}
+        joinThreads(),
+        bannedClients(),
+        bannedClientsMutex() {}
 
 void UDPServerNet::setDelegate(ServerNetDelegate *delegate) {
     this->delegate = delegate;
@@ -62,6 +64,14 @@ void UDPServerNet::start() {
         }
 
         auto addr = SockAddr(peer, peerlen);
+
+        {
+            std::shared_lock<std::shared_mutex> lock(bannedClientsMutex);
+            if (bannedClients.find(addr) != bannedClients.end()) {
+                continue;
+            }
+        }
+
         ClientHandler *handler = nullptr;
         {
             std::unique_lock<std::shared_mutex> lock(clientHandlersMutex);
@@ -123,7 +133,17 @@ void UDPServerNet::stop() {
     clientHandlers.clear();
 }
 
-void UDPServerNet::ioWantsToKillClientWithId(ServerIO *io, uint64_t id) {}
+void UDPServerNet::ioWantsToKillClientWithId(ServerIO *io, uint64_t id) {
+    std::unique_lock<std::shared_mutex> lock1(clientHandlersMutex);
+    for (auto pair : clientHandlers) {
+        if (pair.second->id == id) {
+            std::unique_lock<std::shared_mutex> lock2(bannedClientsMutex);
+            bannedClients.insert(pair.first);
+            clientHandlers.erase(pair.first);
+            return;
+        }
+    }
+}
 
 std::vector<Client> UDPServerNet::ioWantsToListClients(ServerIO *io) {
     std::vector<Client> clients;
