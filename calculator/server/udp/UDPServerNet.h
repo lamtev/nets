@@ -8,6 +8,7 @@
 #include "ClientHandler.h"
 
 #include <unordered_map>
+#include <unordered_set>
 #include <shared_mutex>
 #include <cstdint>
 
@@ -44,6 +45,9 @@ private:
     std::shared_mutex clientHandlersMutex;
     std::atomic<uint64_t> clientCounter;
     std::vector<std::thread> joinThreads;
+
+    std::unordered_set<SockAddr> bannedClients;
+    std::shared_mutex bannedClientsMutex;
 };
 
 #endif //NETS_UDPSERVERNET_H
