@@ -5,6 +5,7 @@
 #include "Message.h"
 
 #include <memory>
+#include <cstring>
 
 
 Message::Message(MessageType type, uint8_t dataSize, uint8_t *data) : _type(type), _dataSize(dataSize), _data(data) {}

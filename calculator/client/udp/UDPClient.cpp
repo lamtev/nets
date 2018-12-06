@@ -8,6 +8,7 @@
 #include <vector>
 #include <unordered_map>
 #include <thread>
+#include <cstring>
 
 #include <sys/socket.h>
 #include <netinet/in.h>
