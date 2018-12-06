@@ -23,9 +23,9 @@ enum class OperationType : uint8_t {
  *
  * Operation binary format:
  *
- *  --------------------------------
- * | Operation type |     Data     |
- * --------------------------------
+ * ---------------------------------
+ * | Operation type |     Data      |
+ * ---------------------------------
  *      1 byte      8 or 16 bytes
  *
  * Data consists of 8 bytes if operation has 1 operand and 16 bytes - otherwise

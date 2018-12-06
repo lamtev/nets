@@ -26,9 +26,9 @@ enum class MessageType : uint8_t {
  *
  * Binary message representation format:
  *
- *  ------------------------------------------
- * | Data size (N) | Message type |   Data   |
- * ------------------------------------------
+ * -------------------------------------------
+ * | Data size (N) | Message type |   Data    |
+ * -------------------------------------------
  *     1 byte          1 byte      N-1 bytes
  *
  * @see MessageType
