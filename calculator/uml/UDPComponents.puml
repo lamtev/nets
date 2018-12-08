@@ -1,0 +1,8 @@
+@startuml
+
+package "UDP client-server application" {
+[UDP Client] - UDP
+UDP - [UDP Server]
+}
+
+@enduml

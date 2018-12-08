@@ -1,0 +1,53 @@
+@startuml
+
+interface ServerNet {
+setDelegate(ServerNetDelegate delegate)
+start()
+stop()
+}
+
+enum ServerNetError {
+SOCKET_CREATE_ERROR
+SOCKET_BIND_ERROR
+SOCKET_LISTEN_ERROR
+SOCKET_ACCEPT_ERROR
+SOCKET_RECEIVE_ERROR
+SOCKET_SEND_ERROR
+KILL_CLIENT_ERROR
+SOCKET_RECEIVE_FROM_ERROR
+SOCKET_SEND_TO_ERROR
+}
+
+interface ServerNetDelegate {
+netDidFailWithError(ServerNet net, ServerNetError error)
+}
+
+interface ServerIODelegate {
+ioWantsToKillClientWithId(ServerIO io, uint64_t id)
+ioWantsToListClients(ServerIO io)
+ioWantsToExit(ServerIO io)
+}
+
+class TCPServer {
+ServerIO io
+TCPServerNet net
+start()
+stop()
+}
+
+class ServerIO {
+ServerIODelegate delegate
+start()
+stop()
+setDelegate(ServerIODelegate delegate)
+}
+
+TCPServer o-- ServerIO
+ServerIO o-- ServerIODelegate
+ServerNetDelegate <|.. ServerIO
+TCPServer o-- TCPServerNet
+TCPServerNet o-- ServerNetDelegate
+ServerNet <|.. TCPServerNet
+ServerIODelegate <|.. TCPServerNet
+
+@enduml

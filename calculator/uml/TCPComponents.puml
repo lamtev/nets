@@ -1,0 +1,8 @@
+@startuml
+
+package "TCP client-server application" {
+[TCP Client] - TCP
+TCP - [TCP Server]
+}
+
+@enduml
