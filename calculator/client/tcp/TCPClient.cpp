@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
     sockaddr_in peer{};
     peer.sin_family = AF_INET;
     try {
-        peer.sin_port = htons(std::stoul(argv[2]));
+        peer.sin_port = htons((uint16_t) std::stoul(argv[2]));
     } catch (const std::exception &e) {
         printHelp();
         return -1;

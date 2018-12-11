@@ -77,101 +77,101 @@ void TCPServerNet::start() {
         return;
     }
 
-    auto acceptThread = std::thread([this]() {
-        while (true) {
-            int acceptedSocket = accept(listeningSocket, nullptr, nullptr);
-            if (acceptedSocket == -1) {
-                if (delegate != nullptr) {
-                    delegate->netDidFailWithError(this, ServerNetError::SOCKET_ACCEPT_ERROR);
-                    break;
-                }
+    while (true) {
+        int acceptedSocket = accept(listeningSocket, nullptr, nullptr);
+        if (acceptedSocket == -1) {
+            if (delegate != nullptr) {
+                delegate->netDidFailWithError(this, ServerNetError::SOCKET_ACCEPT_ERROR);
+                break;
             }
-
-            u_int64_t clientId = nextId();
-            std::thread clientThread([acceptedSocket, this, clientId] {
-                while (true) {
-                    uint8_t bytesInData;
-                    ssize_t bytesReceived = recv(acceptedSocket, &bytesInData, 1, 0);
-                    if (bytesReceived == -1 || bytesReceived == 0) {
-                        if (delegate != nullptr) {
-                            delegate->netDidFailWithError(this, ServerNetError::SOCKET_RECEIVE_ERROR);
-                        }
-                        break;
-                    }
-                    uint8_t bytesToBeReceived = bytesInData + uint8_t(1);
-
-                    auto bytes = new uint8_t[bytesToBeReceived];
-                    bytes[0] = bytesInData;
-
-                    bytesReceived = receiveNBytes(acceptedSocket, bytesInData, &bytes[1]);
-                    if (bytesReceived == -1 || bytesReceived == 0) {
-                        if (delegate != nullptr) {
-                            delegate->netDidFailWithError(this, ServerNetError::SOCKET_RECEIVE_ERROR);
-                        }
-                        break;
-                    }
-
-                    auto request = Message::of(bytes);
-
-                    auto response = handleRequest(request, acceptedSocket);
-
-                    auto bytesToBeSent = response->toBytes();
-
-                    delete[] response->data();
-                    delete request;
-                    delete[] bytes;
-
-                    ssize_t bytesSent = netslib::send(acceptedSocket, bytesToBeSent, response->size());
-
-                    delete[] bytesToBeSent;
-                    delete response;
-
-                    if (bytesSent == -1) {
-                        if (delegate != nullptr) {
-                            delegate->netDidFailWithError(this, ServerNetError::SOCKET_SEND_ERROR);
-                        }
-                    }
-                }
-
-                std::unique_lock<std::shared_mutex> lock(clientsMutex);
-
-                closeSocket(acceptedSocket);
-
-                auto toBeRemoved = std::find_if(clients.cbegin(), clients.cend(),
-                                                [clientId](const ClientSession &client) -> bool {
-                                                    return clientId == client.id;
-                                                });
-
-                if (toBeRemoved != clients.cend()) {
-                    clients.erase(toBeRemoved);
-                }
-            });
-            {
-                std::lock_guard<std::mutex> lock(clientThreadsMutex);
-                clientThreads.push_back(std::move(clientThread));
-            }
-
-            {
-                std::unique_lock<std::shared_mutex> lock(clientsMutex);
-                clients.emplace_back(clientId, acceptedSocket);
-            }
-
         }
 
+        u_int64_t clientId = nextId();
+        std::thread clientThread([acceptedSocket, this, clientId] {
+            while (true) {
+                uint8_t bytesInData;
+                ssize_t bytesReceived = recv(acceptedSocket, &bytesInData, 1, 0);
+                if (bytesReceived == -1 || bytesReceived == 0) {
+                    if (delegate != nullptr) {
+                        delegate->netDidFailWithError(this, ServerNetError::SOCKET_RECEIVE_ERROR);
+                    }
+                    break;
+                }
+                uint8_t bytesToBeReceived = bytesInData + uint8_t(1);
+
+                auto bytes = new uint8_t[bytesToBeReceived];
+                bytes[0] = bytesInData;
+
+                bytesReceived = receiveNBytes(acceptedSocket, bytesInData, &bytes[1]);
+                if (bytesReceived == -1 || bytesReceived == 0) {
+                    if (delegate != nullptr) {
+                        delegate->netDidFailWithError(this, ServerNetError::SOCKET_RECEIVE_ERROR);
+                    }
+                    break;
+                }
+
+                auto request = Message::of(bytes);
+
+                auto response = handleRequest(request, acceptedSocket);
+
+                auto bytesToBeSent = response->toBytes();
+
+                delete[] response->data();
+                delete request;
+                delete[] bytes;
+
+                ssize_t bytesSent = netslib::send(acceptedSocket, bytesToBeSent, response->size());
+
+                delete[] bytesToBeSent;
+                delete response;
+
+                if (bytesSent == -1) {
+                    if (delegate != nullptr) {
+                        delegate->netDidFailWithError(this, ServerNetError::SOCKET_SEND_ERROR);
+                    }
+                }
+            }
+
+            std::unique_lock<std::shared_mutex> lock(clientsMutex);
+
+            closeSocket(acceptedSocket);
+
+            auto toBeRemoved = std::find_if(clients.cbegin(), clients.cend(),
+                                            [clientId](const ClientSession &client) -> bool {
+                                                return clientId == client.id;
+                                            });
+
+            if (toBeRemoved != clients.cend()) {
+                clients.erase(toBeRemoved);
+            }
+        });
+        {
+            std::lock_guard<std::mutex> lock(clientThreadsMutex);
+            clientThreads.push_back(std::move(clientThread));
+        }
+
+        {
+            std::unique_lock<std::shared_mutex> lock(clientsMutex);
+            clients.emplace_back(clientId, acceptedSocket);
+        }
+
+    }
+
+    {
         std::unique_lock<std::shared_mutex> lock(clientsMutex);
         for (auto &client : clients) {
             closeSocket(client.socket);
         }
         clients.clear();
-    });
-
-    acceptThread.join();
-
-    std::lock_guard<std::mutex> lock(clientThreadsMutex);
-    for (std::thread &thread : clientThreads) {
-        thread.join();
     }
-    clientThreads.clear();
+
+    {
+        std::lock_guard<std::mutex> lock(clientThreadsMutex);
+        for (std::thread &thread : clientThreads) {
+            thread.join();
+        }
+        clientThreads.clear();
+    }
 }
 
 void TCPServerNet::stop() {

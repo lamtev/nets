@@ -133,7 +133,7 @@ UDPClient::UDPClient(const char *addr, int port) :
 void UDPClient::start() {
     sockaddr_in peer{};
     peer.sin_family = AF_INET;
-    peer.sin_port = htons(port);
+    peer.sin_port = htons((uint16_t) port);
     peer.sin_addr.s_addr = inet_addr(addr);
 
     socket = ::socket(AF_INET, SOCK_DGRAM, 0);
