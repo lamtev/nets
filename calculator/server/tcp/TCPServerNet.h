@@ -5,11 +5,10 @@
 #ifndef NETS_TCPSERVERNET_H
 #define NETS_TCPSERVERNET_H
 
-#include "ClientSession.h"
-
 #include <cstdint>
 #include <shared_mutex>
 #include <vector>
+#include <unordered_map>
 #include <thread>
 #include <atomic>
 
@@ -27,7 +26,7 @@ private:
     const uint16_t port;
     int listeningSocket;
     ServerNetDelegate *delegate;
-    std::vector<ClientSession> clients;
+    std::unordered_map<uint64_t, int> clients;
     std::shared_mutex clientsMutex;
     std::atomic<uint64_t> idCounter;
 
@@ -54,7 +53,7 @@ private:
 
     static void closeSocket(int socket);
 
-    Message *handleRequest(Message *request, int socket);
+    Message *handleRequest(Message *request, int socket, uint64_t clientId);
 
     void submitHardOperation(const Operation &operation, int socket);
 };

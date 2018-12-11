@@ -6,7 +6,7 @@ add_executable(tcp_calculator_server
         TCPServerLauncher.cpp
         TCPServer.h TCPServer.cpp
         TCPServerNet.h TCPServerNet.cpp
-        ClientSession.h)
+        )
 
 target_include_directories(tcp_calculator_server PUBLIC ${Nets_SOURCE_DIR})
 
