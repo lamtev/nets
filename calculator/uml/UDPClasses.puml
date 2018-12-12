@@ -35,6 +35,10 @@ start()
 stop()
 }
 
+class UDPServerNet {
+ServerNetDelegate delegate
+}
+
 class ServerIO {
 ServerIODelegate delegate
 start()

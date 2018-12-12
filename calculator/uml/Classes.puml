@@ -42,6 +42,14 @@ start()
 stop()
 }
 
+class TCPServerNet {
+ServerNetDelegate delegate
+}
+
+class UDPServerNet {
+ServerNetDelegate delegate
+}
+
 class ServerIO {
 ServerIODelegate delegate
 start()

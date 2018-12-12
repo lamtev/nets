@@ -35,6 +35,10 @@ start()
 stop()
 }
 
+class TCPServerNet {
+ServerNetDelegate delegate
+}
+
 class ServerIO {
 ServerIODelegate delegate
 start()
