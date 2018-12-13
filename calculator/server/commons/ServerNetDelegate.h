@@ -14,6 +14,8 @@ class ServerNet;
 class ServerNetDelegate {
 public:
     virtual void netDidFailWithError(ServerNet *net, ServerNetError error) = 0;
+    
+    virtual ~ServerNetDelegate() = default;
 };
 
 
